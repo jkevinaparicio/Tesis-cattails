@@ -1,4 +1,5 @@
 import axios from "axios";
+import router from "@/router";
 import { API_URL } from "@/config";
 
 const api = axios.create({
@@ -12,5 +13,16 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && router.currentRoute.value.path !== "/login") {
+      localStorage.clear();
+      router.push("/login");
+    }
+    return Promise.reject(error);
+  },
+);
 
 export default api;
