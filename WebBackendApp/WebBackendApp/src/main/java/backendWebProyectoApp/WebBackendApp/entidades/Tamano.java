@@ -13,7 +13,7 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Tamaños {
+public class Tamano {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

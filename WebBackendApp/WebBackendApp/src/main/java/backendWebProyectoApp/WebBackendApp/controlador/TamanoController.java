@@ -1,6 +1,6 @@
 package backendWebProyectoApp.WebBackendApp.controlador;
 
-import backendWebProyectoApp.WebBackendApp.entidades.Tamaños;
+import backendWebProyectoApp.WebBackendApp.entidades.Tamano;
 import backendWebProyectoApp.WebBackendApp.servicios.TamanoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,19 +17,19 @@ public class TamanoController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/crear")
-    public Tamaños crear(@RequestBody Tamaños t) {
+    public Tamano crear(@RequestBody Tamano t) {
         return service.crear(t);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','EMPLEADO')")
     @GetMapping("/todos")
-    public List<Tamaños> listar() {
+    public List<Tamano> listar() {
         return service.listar();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/modificar/{id}")
-    public Tamaños modificar(@PathVariable Integer id, @RequestBody Tamaños t) {
+    public Tamano modificar(@PathVariable Integer id, @RequestBody Tamano t) {
         return service.modificar(id, t);
     }
 
