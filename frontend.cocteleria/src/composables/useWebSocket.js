@@ -1,5 +1,6 @@
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+import { API_URL } from '@/config'
 
 let client = null
 
@@ -8,7 +9,7 @@ export function useWebSocket() {
     const correo = localStorage.getItem('user_correo') || ''
 
     client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8081/ws', null, {
+      webSocketFactory: () => new SockJS(`${API_URL}/ws`, null, {
         transports: ['websocket']
       }),
       reconnectDelay: 3000,

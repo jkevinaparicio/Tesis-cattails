@@ -102,6 +102,7 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
+import { API_URL } from '@/config'
 
 const router    = useRouter()
 const route     = useRoute()
@@ -150,7 +151,7 @@ async function login() {
 }
 
 function loginGoogle() {
-  window.location.href = 'http://localhost:8081/oauth2/authorization/google'
+  window.location.href = `${API_URL}/oauth2/authorization/google`
 }
 
 </script>
