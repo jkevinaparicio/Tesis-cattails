@@ -1,6 +1,6 @@
 package backendWebProyectoApp.WebBackendApp.servicios;
 
-import backendWebProyectoApp.WebBackendApp.entidades.Tamaños;
+import backendWebProyectoApp.WebBackendApp.entidades.Tamano;
 import backendWebProyectoApp.WebBackendApp.repositorios.TamanoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -13,17 +13,17 @@ public class TamanoService {
     @Autowired
     private TamanoRepository repository;
 
-    public Tamaños crear(Tamaños t) {
+    public Tamano crear(Tamano t) {
         return repository.save(t);
     }
 
-    public List<Tamaños> listar() {
+    public List<Tamano> listar() {
         return repository.findAll();
     }
 
-    public Tamaños modificar(Integer id, Tamaños t) {
+    public Tamano modificar(Integer id, Tamano t) {
 
-        Tamaños existente = repository.findById(id)
+        Tamano existente = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tamaño no existe"));
 
         existente.setNombre(t.getNombre());
@@ -32,7 +32,7 @@ public class TamanoService {
     }
 
     public void eliminar(Integer id) {
-        Tamaños t = repository.findById(id)
+        Tamano t = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tamaño no existe"));
 
         repository.delete(t);

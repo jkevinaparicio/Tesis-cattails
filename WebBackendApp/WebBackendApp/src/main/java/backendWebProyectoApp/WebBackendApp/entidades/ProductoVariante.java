@@ -22,7 +22,7 @@ public class ProductoVariante {
 
     @ManyToOne
     @JoinColumn(name = "id_tamaño")
-    private Tamaños tamaño;
+    private Tamano tamaño;
 
     @Column(nullable = false)
     private BigDecimal precio;
