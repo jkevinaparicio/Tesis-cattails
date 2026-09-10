@@ -9,7 +9,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/asistente")
-@CrossOrigin("*")
 @RequiredArgsConstructor
 public class AsistenteController {
 
