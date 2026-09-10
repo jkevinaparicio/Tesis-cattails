@@ -9,14 +9,7 @@
     <div class="login-card">
       <div class="logo">
         <div class="logo-icon">
-          <svg width="38" height="38" viewBox="0 0 56 56">
-            <polygon points="28,6 52,46 4,46" fill="none" stroke="#60a5fa" stroke-width="1.8"/>
-            <polygon points="28,14 45,43 11,43" fill="none" stroke="#93c5fd" stroke-width="0.9" opacity="0.5"/>
-            <circle cx="28" cy="28" r="4" fill="#3b82f6" opacity="0.9"/>
-            <circle cx="28" cy="28" r="2" fill="#93c5fd"/>
-            <rect x="22" y="46" width="12" height="6" rx="1" fill="#1e3a6a"/>
-            <rect x="18" y="52" width="20" height="2" rx="1" fill="#60a5fa" opacity="0.7"/>
-          </svg>
+          <img :src="logo" alt="Cattails" class="logo-img" />
         </div>
         <h1>Cattails</h1>
         <p>Granizados</p>
@@ -81,7 +74,6 @@
       </div>
 
       <!-- Botón Google -->
-      <!-- Botón Google -->
       <button class="btn-google" @click="loginGoogle">
         <svg width="18" height="18" viewBox="0 0 48 48">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -102,7 +94,10 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
-import { API_URL } from '@/config'
+import logo from '@/assets/logo.png'
+
+// URL base del backend (misma variable que usa el resto de la app para las llamadas API)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081'
 
 const router    = useRouter()
 const route     = useRoute()
@@ -193,10 +188,12 @@ function loginGoogle() {
 
 .logo { text-align: center; margin-bottom: 2rem; }
 .logo-icon {
-  width: 62px; height: 62px; border-radius: 16px;
+  width: 90px; height: 90px;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 14px;
-  background: #eff6ff; border: 1px solid #bfdbfe;
+}
+.logo-img {
+  width: 100%; height: 100%; object-fit: contain;
 }
 .logo h1 {
   font-family: 'Playfair Display', serif;
