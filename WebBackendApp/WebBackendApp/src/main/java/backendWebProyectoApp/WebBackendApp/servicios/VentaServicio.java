@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -135,6 +136,22 @@ public class VentaServicio {
 
     public List<VentaDTO> verPorSede(Integer idSede) {
         return ventaRepository.findBySede_IdOrderByFechaDesc(idSede)
+                .stream()
+                .map(this::mapearVenta)
+                .toList();
+    }
+
+    // Ventas de un día de negocio completo (ej: "viernes" incluye hasta la 1am del sábado)
+    public List<VentaDTO> verPorFechaNegocio(LocalDate fecha) {
+        return ventaRepository.findByFechaNegocioOrderByFechaDesc(fecha)
+                .stream()
+                .map(this::mapearVenta)
+                .toList();
+    }
+
+    // Igual que arriba pero filtrado por sede, útil para el cierre de caja de cada local
+    public List<VentaDTO> verPorSedeYFechaNegocio(Integer idSede, LocalDate fecha) {
+        return ventaRepository.findBySede_IdAndFechaNegocioOrderByFechaDesc(idSede, fecha)
                 .stream()
                 .map(this::mapearVenta)
                 .toList();
