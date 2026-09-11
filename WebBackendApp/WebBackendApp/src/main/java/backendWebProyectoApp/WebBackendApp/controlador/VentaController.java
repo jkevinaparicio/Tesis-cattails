@@ -5,14 +5,17 @@ import backendWebProyectoApp.WebBackendApp.dto.VentaDTO;
 import backendWebProyectoApp.WebBackendApp.entidades.Venta;
 import backendWebProyectoApp.WebBackendApp.servicios.VentaServicio;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 @RestController
 @RequestMapping("/ventas")
+@CrossOrigin("*")
 public class VentaController {
 
     @Autowired
@@ -50,6 +53,24 @@ public class VentaController {
     @GetMapping("/sede/{id}")
     public ResponseEntity<List<VentaDTO>> porSede(@PathVariable Integer id) {
         return ResponseEntity.ok(servicio.verPorSede(id));
+    }
+
+    // Cierre de caja: todas las ventas de un día de negocio (viernes/sábado
+    // incluyen lo vendido hasta la 1am del día siguiente)
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/fecha/{fecha}")
+    public ResponseEntity<List<VentaDTO>> porFechaNegocio(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return ResponseEntity.ok(servicio.verPorFechaNegocio(fecha));
+    }
+
+    // Igual que arriba pero filtrado por sede, para el cierre de cada local
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLEADO')")
+    @GetMapping("/sede/{id}/fecha/{fecha}")
+    public ResponseEntity<List<VentaDTO>> porSedeYFecha(
+            @PathVariable Integer id,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return ResponseEntity.ok(servicio.verPorSedeYFechaNegocio(id, fecha));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
