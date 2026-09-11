@@ -7,43 +7,56 @@
 
     <!-- FORM CREAR EN LOTE -->
     <div v-if="showForm" class="fbox">
-      <p class="fep">Agregar stock al inventario — Puedes agregar varios a la vez</p>
+      <p class="fep">Agregar stock al inventario — elige sede y producto, y marca los tamaños que quieras cargar</p>
 
       <div v-for="(item, idx) in lote" :key="idx" class="lote-inv-row">
-        <span class="lote-num">#{{ idx + 1 }}</span>
-        <div class="frow s3" style="flex:1;">
-          <div class="ff">
-            <label>Sede</label>
-            <select v-model="item.sedeId">
-              <option value="">Seleccionar sede...</option>
-              <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-            </select>
+        <div class="lote-head">
+          <span class="lote-num">#{{ idx + 1 }}</span>
+          <div class="frow s2" style="flex:1;">
+            <div class="ff">
+              <label>Sede</label>
+              <select v-model="item.sedeId">
+                <option value="">Seleccionar sede...</option>
+                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
+            <div class="ff">
+              <label>Producto</label>
+              <select v-model="item.prodId" @change="onProdChange(idx)">
+                <option value="">Seleccionar producto...</option>
+                <option v-for="p in productos" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+              </select>
+            </div>
           </div>
-          <div class="ff">
-            <label>Producto</label>
-            <select v-model="item.prodId" @change="onProdChange(idx)">
-              <option value="">Seleccionar producto...</option>
-              <option v-for="p in productos" :key="p.id" :value="p.id">{{ p.nombre }}</option>
-            </select>
-          </div>
-          <div class="ff">
-            <label>Variante (tamaño)</label>
-            <select v-model="item.varianteId" :disabled="!item.variantes?.length">
-              <option value="">{{ item.prodId ? 'Seleccionar...' : 'Primero elige producto' }}</option>
-              <option v-for="v in item.variantes" :key="v.id" :value="v.id">
-                {{ v.tamaño?.nombre ?? v.tamano?.nombre }} — ${{ Number(v.precio).toLocaleString() }}
-              </option>
-            </select>
-          </div>
-          <div class="ff" style="max-width:140px;">
-            <label>Cantidad</label>
-            <input v-model="item.cantidad" type="number" placeholder="100" min="1"/>
+          <button v-if="lote.length > 1" class="bsm bd lote-rm" @click="quitarFila(idx)" title="Quitar">✕</button>
+        </div>
+
+        <!-- Tamaños del producto elegido: se pueden marcar varios a la vez -->
+        <div v-if="item.prodId" class="tam-box">
+          <p v-if="item.cargando" class="tam-loading">Cargando tamaños...</p>
+          <p v-else-if="!item.variantes.length" class="tam-empty">Este producto no tiene tamaños/variantes creados.</p>
+          <div v-else class="tam-grid">
+            <label
+              v-for="v in item.variantes" :key="v.id"
+              class="tam-chip"
+              :class="{ on: v.selected }"
+            >
+              <input type="checkbox" v-model="v.selected" />
+              <span class="tam-nombre">{{ v.tamaño?.nombre ?? v.tamano?.nombre }}</span>
+              <span class="tam-precio">${{ Number(v.precio).toLocaleString() }}</span>
+              <input
+                v-model="v.cantidad"
+                type="number" min="1" placeholder="100"
+                class="tam-cant"
+                :disabled="!v.selected"
+                @focus="v.selected = true"
+              />
+            </label>
           </div>
         </div>
-        <button v-if="lote.length > 1" class="bsm bd lote-rm" @click="quitarFila(idx)" title="Quitar">✕</button>
       </div>
 
-      <button class="bsm be2 lote-add" @click="agregarFila">+ Agregar otro</button>
+      <button class="bsm be2 lote-add" @click="agregarFila">+ Agregar otra sede/producto</button>
 
       <div class="fact">
         <button class="bpri" @click="crearLote">Guardar todos</button>
@@ -143,7 +156,7 @@ const sedeFilter = ref('')
 const sumando    = ref(null)
 const cantSumar  = ref('')
 
-// Cada fila del lote tiene sus propias variantes cargadas
+// Cada fila del lote = una sede + un producto, con checkboxes de tamaños dentro
 const lote = ref([filaVacia()])
 
 const msg      = ref(''); const msgOk     = ref(true)
@@ -175,7 +188,7 @@ onMounted(async () => {
 onUnmounted(() => remover?.())
 
 function filaVacia() {
-  return { sedeId: miSedeId || '', prodId: '', varianteId: '', cantidad: 100, variantes: [] }
+  return { sedeId: miSedeId || '', prodId: '', variantes: [], cargando: false }
 }
 
 function agregarFila()   { lote.value.push(filaVacia()) }
@@ -183,10 +196,14 @@ function quitarFila(idx) { lote.value.splice(idx, 1) }
 
 async function onProdChange(idx) {
   const item = lote.value[idx]
-  item.varianteId = ''
-  item.variantes  = []
+  item.variantes = []
   if (!item.prodId) return
-  item.variantes = await api('GET', `/variantes/producto/${item.prodId}`).catch(() => [])
+  item.cargando = true
+  const data = await api('GET', `/variantes/producto/${item.prodId}`).catch(() => [])
+  // cada variante trae su propio flag de selección y cantidad, así puedes
+  // marcar varios tamaños del mismo producto en una sola pasada
+  item.variantes = data.map(v => ({ ...v, selected: false, cantidad: 100 }))
+  item.cargando = false
 }
 
 async function toggleForm() {
@@ -201,19 +218,27 @@ async function filtrar() {
 }
 
 async function crearLote() {
-  const validos = lote.value.filter(i =>
-    i.sedeId && i.varianteId && i.cantidad && parseInt(i.cantidad) > 0
-  )
-  if (!validos.length) {
-    setMsg('Cada fila necesita sede, variante y cantidad válida', false); return
+  // aplana: por cada fila (sede+producto), por cada tamaño marcado con cantidad válida
+  const registros = []
+  for (const item of lote.value) {
+    if (!item.sedeId) continue
+    for (const v of item.variantes) {
+      if (v.selected && v.cantidad && parseInt(v.cantidad) > 0) {
+        registros.push({
+          idVariante: parseInt(v.id),
+          idSede:     parseInt(item.sedeId),
+          stock:      parseInt(v.cantidad)
+        })
+      }
+    }
+  }
+
+  if (!registros.length) {
+    setMsg('Marca al menos un tamaño con cantidad válida', false); return
   }
 
   const resultados = await Promise.allSettled(
-    validos.map(i => api('POST', '/inventario/crear', {
-      idVariante: parseInt(i.varianteId),
-      idSede:     parseInt(i.sedeId),
-      stock:      parseInt(i.cantidad)
-    }))
+    registros.map(r => api('POST', '/inventario/crear', r))
   )
 
   const ok  = resultados.filter(r => r.status === 'fulfilled').length
@@ -265,15 +290,17 @@ async function quitarDeSede(item) {
 
 <style scoped>
 .lote-inv-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border, #333) 60%, transparent);
 }
 .lote-inv-row:last-of-type {
   border-bottom: none;
+}
+.lote-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 .lote-num {
   font-size: 0.75rem;
@@ -288,5 +315,52 @@ async function quitarDeSede(item) {
 }
 .lote-add {
   margin-bottom: 1rem;
+}
+
+.tam-box {
+  margin-top: 0.75rem;
+  padding-left: 30px;
+}
+.tam-loading, .tam-empty {
+  font-size: 0.8rem;
+  color: var(--text3);
+}
+.tam-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tam-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--border, #333) 70%, transparent);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.tam-chip.on {
+  border-color: var(--purple);
+  background: color-mix(in srgb, var(--purple) 8%, transparent);
+}
+.tam-chip input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.tam-nombre {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.tam-precio {
+  font-size: 0.78rem;
+  color: var(--cyan);
+}
+.tam-cant {
+  width: 64px;
+  font-size: 0.8rem;
+  padding: 2px 4px;
 }
 </style>
