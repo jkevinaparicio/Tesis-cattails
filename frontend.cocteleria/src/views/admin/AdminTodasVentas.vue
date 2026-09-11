@@ -18,12 +18,32 @@
       </div>
       <div class="ff" style="margin:0; min-width:180px;">
         <label>Por sede</label>
-        <select v-model="filtroSede" @change="filtrarSede">
+        <select v-model="filtroSede" @change="filtrarPorFechaOSede">
           <option value="">Todas...</option>
           <option v-for="s in sedes" :key="s.id" :value="s.id">
             {{ s.nombre }}
           </option>
         </select>
+      </div>
+      <div class="ff" style="margin:0; min-width:170px;">
+        <label>Día (cierre de caja)</label>
+        <input v-model="filtroFecha" type="date" @change="filtrarPorFechaOSede" />
+      </div>
+      <button v-if="filtroFecha" class="bsm bd" @click="limpiarFecha">✕ Quitar fecha</button>
+    </div>
+
+    <p v-if="filtroFecha" class="c-muted" style="font-size:0.78rem; margin:-0.75rem 0 1rem;">
+      Viernes y sábado el corte es a la 1am, así que ese día incluye lo vendido en la madrugada siguiente.
+    </p>
+
+    <div v-if="filtroFecha" class="resumen-cierre">
+      <div class="resumen-card">
+        <span class="resumen-label">Ventas</span>
+        <span class="resumen-valor">{{ ventas.length }}</span>
+      </div>
+      <div class="resumen-card">
+        <span class="resumen-label">Total del día</span>
+        <span class="resumen-valor c-cyan">${{ totalDia.toLocaleString() }}</span>
       </div>
     </div>
 
@@ -142,7 +162,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAdmin } from '@/composables/useAdmin'
 import { useWebSocket } from '@/composables/useWebSocket'
 
@@ -154,6 +174,7 @@ const usuarios      = ref([])
 const sedes         = ref([])
 const filtroUsuario = ref('')
 const filtroSede    = ref('')
+const filtroFecha   = ref('')
 const ventaDetalle  = ref(null)
 
 const metodosMap = {
@@ -161,6 +182,10 @@ const metodosMap = {
   NEQUI:       '📱 Nequi',
   BANCOLOMBIA: '🏦 Bancolombia',
 }
+
+const totalDia = computed(() =>
+  ventas.value.reduce((acc, v) => acc + Number(v.total || 0), 0)
+)
 
 onMounted(async () => {
   await cargar()
@@ -186,6 +211,7 @@ async function cargar() {
     sedes.value    = s
     filtroUsuario.value = ''
     filtroSede.value    = ''
+    filtroFecha.value   = ''
   } catch {
     ventas.value = []
   } finally {
@@ -194,23 +220,39 @@ async function cargar() {
 }
 
 async function filtrarUsuario() {
+  filtroSede.value  = ''
+  filtroFecha.value = ''
   if (!filtroUsuario.value) { cargar(); return }
   loading.value = true
   try {
     ventas.value = await api('GET', `/ventas/usuario/${filtroUsuario.value}`)
-    filtroSede.value = ''
   } catch { ventas.value = [] }
   finally { loading.value = false }
 }
 
-async function filtrarSede() {
-  if (!filtroSede.value) { cargar(); return }
+// combina sede + fecha: si hay fecha usa el endpoint de cierre de caja
+// (con o sin sede), si no hay fecha cae al filtro normal por sede
+async function filtrarPorFechaOSede() {
+  filtroUsuario.value = ''
+
+  if (!filtroFecha.value && !filtroSede.value) { cargar(); return }
+
   loading.value = true
   try {
-    ventas.value = await api('GET', `/ventas/sede/${filtroSede.value}`)
-    filtroUsuario.value = ''
+    if (filtroFecha.value && filtroSede.value) {
+      ventas.value = await api('GET', `/ventas/sede/${filtroSede.value}/fecha/${filtroFecha.value}`)
+    } else if (filtroFecha.value) {
+      ventas.value = await api('GET', `/ventas/fecha/${filtroFecha.value}`)
+    } else {
+      ventas.value = await api('GET', `/ventas/sede/${filtroSede.value}`)
+    }
   } catch { ventas.value = [] }
   finally { loading.value = false }
+}
+
+function limpiarFecha() {
+  filtroFecha.value = ''
+  filtrarPorFechaOSede()
 }
 
 async function eliminar(id) {
@@ -286,4 +328,27 @@ function verDetalle(v) {
 }
 .modal-fecha { font-size: 0.78rem; color: var(--text3); font-weight: 500; }
 .modal-total { display: flex; align-items: baseline; gap: 12px; }
+
+.resumen-cierre {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.resumen-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--border, #333) 70%, transparent);
+  border-radius: 8px;
+}
+.resumen-label {
+  font-size: 0.75rem;
+  color: var(--text3);
+}
+.resumen-valor {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
 </style>
