@@ -11,7 +11,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/sedes")
 @RequiredArgsConstructor
-@CrossOrigin("*")
 public class SedeController {
 
     private final SedeService sedeService;

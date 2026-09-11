@@ -12,7 +12,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/variantes")
-@CrossOrigin(origins = "*")
 public class ProductoVarianteController {
 
     @Autowired
