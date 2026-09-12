@@ -1,5 +1,6 @@
 package backendWebProyectoApp.WebBackendApp.entidades;
 
+import backendWebProyectoApp.WebBackendApp.entidades.FechaNegocioUtil;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -29,6 +30,9 @@ public class Venta {
     private Sede sede;
 
     private BigDecimal total;
+
+    @Column(name = "valor_domicilio")
+    private BigDecimal valorDomicilio;
 
     @JsonManagedReference
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
