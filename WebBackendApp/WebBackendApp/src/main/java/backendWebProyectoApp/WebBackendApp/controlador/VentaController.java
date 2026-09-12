@@ -5,6 +5,7 @@ import backendWebProyectoApp.WebBackendApp.dto.VentaDTO;
 import backendWebProyectoApp.WebBackendApp.entidades.Venta;
 import backendWebProyectoApp.WebBackendApp.servicios.VentaServicio;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -34,8 +35,10 @@ public class VentaController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/todas")
-    public ResponseEntity<List<VentaDTO>> todas() {
-        return ResponseEntity.ok(servicio.verVentas());
+    public ResponseEntity<Page<VentaDTO>> todas(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(servicio.verVentasPaginado(page, size));
     }
 
     @GetMapping("/mis-ventas")
@@ -45,32 +48,39 @@ public class VentaController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/usuario/{nombre}")
-    public ResponseEntity<List<VentaDTO>> porUsuario(@PathVariable String nombre) {
-        return ResponseEntity.ok(servicio.verPorNombreUsuario(nombre));
+    public ResponseEntity<Page<VentaDTO>> porUsuario(
+            @PathVariable String nombre,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(servicio.verPorNombreUsuarioPaginado(nombre, page, size));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/sede/{id}")
-    public ResponseEntity<List<VentaDTO>> porSede(@PathVariable Integer id) {
-        return ResponseEntity.ok(servicio.verPorSede(id));
+    public ResponseEntity<Page<VentaDTO>> porSede(
+            @PathVariable Integer id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(servicio.verPorSedePaginado(id, page, size));
     }
 
-    // Cierre de caja: todas las ventas de un día de negocio (viernes/sábado
-    // incluyen lo vendido hasta la 1am del día siguiente)
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/fecha/{fecha}")
-    public ResponseEntity<List<VentaDTO>> porFechaNegocio(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        return ResponseEntity.ok(servicio.verPorFechaNegocio(fecha));
+    public ResponseEntity<Page<VentaDTO>> porFechaNegocio(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(servicio.verPorFechaNegocioPaginado(fecha, page, size));
     }
 
-    // Igual que arriba pero filtrado por sede, para el cierre de cada local
     @PreAuthorize("hasAnyRole('ADMIN','EMPLEADO')")
     @GetMapping("/sede/{id}/fecha/{fecha}")
-    public ResponseEntity<List<VentaDTO>> porSedeYFecha(
+    public ResponseEntity<Page<VentaDTO>> porSedeYFecha(
             @PathVariable Integer id,
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        return ResponseEntity.ok(servicio.verPorSedeYFechaNegocio(id, fecha));
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(servicio.verPorSedeYFechaNegocioPaginado(id, fecha, page, size));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
