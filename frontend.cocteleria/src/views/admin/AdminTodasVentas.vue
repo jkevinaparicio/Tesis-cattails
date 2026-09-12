@@ -36,14 +36,14 @@
       Viernes y sábado el corte es a la 1am, así que ese día incluye lo vendido en la madrugada siguiente.
     </p>
 
-    <div v-if="filtroFecha" class="resumen-cierre">
+    <div class="resumen-cierre">
       <div class="resumen-card">
-        <span class="resumen-label">Ventas</span>
-        <span class="resumen-valor">{{ ventas.length }}</span>
+        <span class="resumen-label">Ventas totales</span>
+        <span class="resumen-valor">{{ totalElementos }}</span>
       </div>
       <div class="resumen-card">
-        <span class="resumen-label">Total del día</span>
-        <span class="resumen-valor c-cyan">${{ totalDia.toLocaleString() }}</span>
+        <span class="resumen-label">{{ filtroFecha ? 'Total de esta página' : 'Suma de esta página' }}</span>
+        <span class="resumen-valor c-cyan">${{ totalPagina.toLocaleString() }}</span>
       </div>
     </div>
 
@@ -98,6 +98,12 @@
       </table>
     </div>
 
+    <div class="paginador" v-if="totalPaginas > 1">
+      <button class="bsm bd" :disabled="pagina === 0" @click="irAPagina(pagina - 1)">‹ Anterior</button>
+      <span class="pag-info">Página {{ pagina + 1 }} de {{ totalPaginas }}</span>
+      <button class="bsm bd" :disabled="pagina >= totalPaginas - 1" @click="irAPagina(pagina + 1)">Siguiente ›</button>
+    </div>
+
     <!-- MODAL -->
     <div v-if="ventaDetalle" class="modal-overlay" @click.self="ventaDetalle = null">
       <div class="modal-box">
@@ -149,9 +155,22 @@
           </div>
         </div>
 
-        <div class="modal-footer">
+        <div class="modal-footer" style="flex-direction:column; align-items:stretch; gap:10px;">
           <p class="modal-fecha">{{ ventaDetalle.fecha }}</p>
-          <div class="modal-total">
+          <div v-if="ventaDetalle.tipoPedido === 'DOMICILIO' && Number(ventaDetalle.valorDomicilio) > 0"
+               style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span style="font-size:0.78rem; color:var(--text3);">Subtotal productos</span>
+              <span style="font-size:0.85rem; color:var(--text2);">${{ subtotalProductosDetalle.toLocaleString() }}</span>
+            </div>
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span style="font-size:0.78rem; color:var(--text3);">🛵 Domicilio</span>
+              <span style="font-size:0.85rem; color:var(--purple); font-weight:600;">
+                ${{ Number(ventaDetalle.valorDomicilio).toLocaleString() }}
+              </span>
+            </div>
+          </div>
+          <div class="modal-total" style="align-self:flex-end;">
             <span class="ct-lbl">Total</span>
             <span class="ct-val">${{ Number(ventaDetalle.total).toLocaleString() }}</span>
           </div>
@@ -169,13 +188,19 @@ import { useWebSocket } from '@/composables/useWebSocket'
 const { api, loading } = useAdmin()
 const { conectar, desconectar } = useWebSocket()
 
-const ventas        = ref([])
-const usuarios      = ref([])
-const sedes         = ref([])
-const filtroUsuario = ref('')
-const filtroSede    = ref('')
-const filtroFecha   = ref('')
-const ventaDetalle  = ref(null)
+const TAMANO_PAGINA = 50
+
+const ventas         = ref([])
+const usuarios       = ref([])
+const sedes          = ref([])
+const filtroUsuario  = ref('')
+const filtroSede     = ref('')
+const filtroFecha    = ref('')
+const ventaDetalle   = ref(null)
+
+const pagina        = ref(0)
+const totalPaginas   = ref(0)
+const totalElementos = ref(0)
 
 const metodosMap = {
   EFECTIVO:    '💵 Efectivo',
@@ -183,83 +208,108 @@ const metodosMap = {
   BANCOLOMBIA: '🏦 Bancolombia',
 }
 
-const totalDia = computed(() =>
+const totalPagina = computed(() =>
   ventas.value.reduce((acc, v) => acc + Number(v.total || 0), 0)
 )
 
+const subtotalProductosDetalle = computed(() => {
+  if (!ventaDetalle.value?.detalles) return 0
+  return ventaDetalle.value.detalles.reduce((acc, d) => acc + Number(d.subtotal || 0), 0)
+})
+
 onMounted(async () => {
+  const [u, s] = await Promise.all([
+    api('GET', '/usuarios').catch(() => []),
+    api('GET', '/sedes/listar').catch(() => [])
+  ])
+  usuarios.value = u
+  sedes.value    = s
   await cargar()
+
   conectar((ventaNueva) => {
-    // evita duplicados
-    const existe = ventas.value.find(v => v.id === ventaNueva.id)
-    if (!existe) ventas.value.unshift(ventaNueva)
+    // solo la agregamos arriba si estamos viendo la primera página sin filtros
+    const sinFiltros = !filtroUsuario.value && !filtroSede.value && !filtroFecha.value
+    if (sinFiltros && pagina.value === 0) {
+      const existe = ventas.value.find(v => v.id === ventaNueva.id)
+      if (!existe) ventas.value.unshift(ventaNueva)
+    }
   })
 })
 
 onUnmounted(() => desconectar())
 
-async function cargar() {
+// aplica la paginación server-side según el/los filtro(s) activos
+async function aplicarPagina() {
   loading.value = true
   try {
-    const [v, u, s] = await Promise.all([
-      api('GET', '/ventas/todas'),
-      api('GET', '/usuarios'),
-      api('GET', '/sedes/listar')
-    ])
-    ventas.value   = v
-    usuarios.value = u
-    sedes.value    = s
-    filtroUsuario.value = ''
-    filtroSede.value    = ''
-    filtroFecha.value   = ''
+    const qp = `page=${pagina.value}&size=${TAMANO_PAGINA}`
+    let url
+
+    if (filtroUsuario.value) {
+      url = `/ventas/usuario/${filtroUsuario.value}?${qp}`
+    } else if (filtroFecha.value && filtroSede.value) {
+      url = `/ventas/sede/${filtroSede.value}/fecha/${filtroFecha.value}?${qp}`
+    } else if (filtroFecha.value) {
+      url = `/ventas/fecha/${filtroFecha.value}?${qp}`
+    } else if (filtroSede.value) {
+      url = `/ventas/sede/${filtroSede.value}?${qp}`
+    } else {
+      url = `/ventas/todas?${qp}`
+    }
+
+    const res = await api('GET', url)
+    ventas.value        = res.content ?? []
+    totalPaginas.value   = res.totalPages ?? 0
+    totalElementos.value = res.totalElements ?? ventas.value.length
   } catch {
     ventas.value = []
+    totalPaginas.value = 0
+    totalElementos.value = 0
   } finally {
     loading.value = false
   }
 }
 
+async function cargar() {
+  filtroUsuario.value = ''
+  filtroSede.value    = ''
+  filtroFecha.value   = ''
+  pagina.value        = 0
+  await aplicarPagina()
+}
+
 async function filtrarUsuario() {
   filtroSede.value  = ''
   filtroFecha.value = ''
-  if (!filtroUsuario.value) { cargar(); return }
-  loading.value = true
-  try {
-    ventas.value = await api('GET', `/ventas/usuario/${filtroUsuario.value}`)
-  } catch { ventas.value = [] }
-  finally { loading.value = false }
+  pagina.value      = 0
+  if (!filtroUsuario.value) { await cargar(); return }
+  await aplicarPagina()
 }
 
-// combina sede + fecha: si hay fecha usa el endpoint de cierre de caja
-// (con o sin sede), si no hay fecha cae al filtro normal por sede
+// combina sede + fecha; si no hay ninguno de los dos, cae al listado general
 async function filtrarPorFechaOSede() {
   filtroUsuario.value = ''
-
-  if (!filtroFecha.value && !filtroSede.value) { cargar(); return }
-
-  loading.value = true
-  try {
-    if (filtroFecha.value && filtroSede.value) {
-      ventas.value = await api('GET', `/ventas/sede/${filtroSede.value}/fecha/${filtroFecha.value}`)
-    } else if (filtroFecha.value) {
-      ventas.value = await api('GET', `/ventas/fecha/${filtroFecha.value}`)
-    } else {
-      ventas.value = await api('GET', `/ventas/sede/${filtroSede.value}`)
-    }
-  } catch { ventas.value = [] }
-  finally { loading.value = false }
+  pagina.value        = 0
+  await aplicarPagina()
 }
 
 function limpiarFecha() {
   filtroFecha.value = ''
-  filtrarPorFechaOSede()
+  pagina.value = 0
+  aplicarPagina()
+}
+
+function irAPagina(nueva) {
+  if (nueva < 0 || nueva >= totalPaginas.value) return
+  pagina.value = nueva
+  aplicarPagina()
 }
 
 async function eliminar(id) {
   if (!confirm('¿Eliminar esta venta?')) return
   try {
     await api('DELETE', `/ventas/eliminar/${id}`)
-    ventas.value = ventas.value.filter(v => v.id !== id)
+    await aplicarPagina()
   } catch (e) { alert(e.message) }
 }
 
@@ -350,5 +400,18 @@ function verDetalle(v) {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text);
+}
+
+.paginador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.pag-info {
+  font-size: 0.85rem;
+  color: var(--text2);
+  font-weight: 500;
 }
 </style>
