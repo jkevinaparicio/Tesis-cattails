@@ -6,6 +6,9 @@ import backendWebProyectoApp.WebBackendApp.dto.VentaDTO;
 import backendWebProyectoApp.WebBackendApp.entidades.*;
 import backendWebProyectoApp.WebBackendApp.repositorios.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +61,11 @@ public class VentaServicio {
         venta.setFecha(LocalDateTime.now());
         venta.setMetodoPago(dto.getMetodoPago() != null ? dto.getMetodoPago() : "EFECTIVO");
         venta.setTipoPedido(dto.getTipoPedido() != null ? dto.getTipoPedido() : "LOCAL");
+
+        BigDecimal valorDomicilio = "DOMICILIO".equals(venta.getTipoPedido()) && dto.getValorDomicilio() != null
+                ? dto.getValorDomicilio()
+                : BigDecimal.ZERO;
+        venta.setValorDomicilio(valorDomicilio);
 
         Venta guardada = ventaRepository.save(venta);
         ConfigPromocion config = configPromocionRepository.findFirstBy().orElse(null);
@@ -115,7 +123,7 @@ public class VentaServicio {
             total = total.add(subtotal);
         }
 
-        guardada.setTotal(total);
+        guardada.setTotal(total.add(valorDomicilio));
 
         return mapearVenta(ventaRepository.save(guardada));
     }
@@ -141,7 +149,6 @@ public class VentaServicio {
                 .toList();
     }
 
-    // Ventas de un día de negocio completo (ej: "viernes" incluye hasta la 1am del sábado)
     public List<VentaDTO> verPorFechaNegocio(LocalDate fecha) {
         return ventaRepository.findByFechaNegocioOrderByFechaDesc(fecha)
                 .stream()
@@ -149,12 +156,41 @@ public class VentaServicio {
                 .toList();
     }
 
-    // Igual que arriba pero filtrado por sede, útil para el cierre de caja de cada local
     public List<VentaDTO> verPorSedeYFechaNegocio(Integer idSede, LocalDate fecha) {
         return ventaRepository.findBySede_IdAndFechaNegocioOrderByFechaDesc(idSede, fecha)
                 .stream()
                 .map(this::mapearVenta)
                 .toList();
+    }
+
+    public Page<VentaDTO> verVentasPaginado(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ventaRepository.findAllByOrderByFechaDesc(pageable)
+                .map(this::mapearVenta);
+    }
+
+    public Page<VentaDTO> verPorNombreUsuarioPaginado(String nombre, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ventaRepository.findByUsuario_NombreOrderByFechaDesc(nombre, pageable)
+                .map(this::mapearVenta);
+    }
+
+    public Page<VentaDTO> verPorSedePaginado(Integer idSede, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ventaRepository.findBySede_IdOrderByFechaDesc(idSede, pageable)
+                .map(this::mapearVenta);
+    }
+
+    public Page<VentaDTO> verPorFechaNegocioPaginado(LocalDate fecha, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ventaRepository.findByFechaNegocioOrderByFechaDesc(fecha, pageable)
+                .map(this::mapearVenta);
+    }
+
+    public Page<VentaDTO> verPorSedeYFechaNegocioPaginado(Integer idSede, LocalDate fecha, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ventaRepository.findBySede_IdAndFechaNegocioOrderByFechaDesc(idSede, fecha, pageable)
+                .map(this::mapearVenta);
     }
 
     @Transactional
@@ -181,6 +217,11 @@ public class VentaServicio {
 
         venta.setMetodoPago(dto.getMetodoPago() != null ? dto.getMetodoPago() : venta.getMetodoPago());
         venta.setTipoPedido(dto.getTipoPedido() != null ? dto.getTipoPedido() : venta.getTipoPedido());
+
+        BigDecimal valorDomicilio = "DOMICILIO".equals(venta.getTipoPedido()) && dto.getValorDomicilio() != null
+                ? dto.getValorDomicilio()
+                : BigDecimal.ZERO;
+        venta.setValorDomicilio(valorDomicilio);
 
         ConfigPromocion config = configPromocionRepository.findFirstBy().orElse(null);
         DayOfWeek hoy = LocalDateTime.now().getDayOfWeek();
@@ -236,7 +277,7 @@ public class VentaServicio {
         }
 
         venta.setDetalleVentas(detalles);
-        venta.setTotal(total);
+        venta.setTotal(total.add(valorDomicilio));
         venta.setFecha(LocalDateTime.now());
 
         return mapearVenta(ventaRepository.save(venta));
@@ -256,6 +297,7 @@ public class VentaServicio {
         dto.setUsuario(v.getUsuario().getNombre());
         dto.setSede(v.getSede().getNombre());
         dto.setTotal(v.getTotal());
+        dto.setValorDomicilio(v.getValorDomicilio());
         dto.setFecha(v.getFecha());
         dto.setMetodoPago(v.getMetodoPago());
         dto.setTipoPedido(v.getTipoPedido());
@@ -278,9 +320,25 @@ public class VentaServicio {
         return dto;
     }
 
+    @Transactional
     public void eliminarVenta(Integer id) {
         Venta venta = ventaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Venta no existe"));
+
+        for (DetalleVenta d : venta.getDetalleVentas()) {
+            ProductoVariante variante = varianteRepository
+                    .findByProducto_IdAndTamaño_Id(
+                            d.getProducto().getId(),
+                            d.getTamaño().getId()
+                    ).orElseThrow(() -> new RuntimeException("Variante no existe"));
+
+            inventarioService.aumentarStock(
+                    variante.getId(),
+                    venta.getSede().getId(),
+                    d.getCantidad()
+            );
+        }
+
         ventaRepository.delete(venta);
     }
 
