@@ -1,16 +1,16 @@
 package backendWebProyectoApp.WebBackendApp.repositorios;
 
-import backendWebProyectoApp.WebBackendApp.entidades.Tamaños;
+import backendWebProyectoApp.WebBackendApp.entidades.Tamano;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 @Repository
-public interface TamanoRepository extends JpaRepository<Tamaños, Integer> {
+public interface TamanoRepository extends JpaRepository<Tamano, Integer> {
 
-    Optional<Tamaños> findByNombre(String nombre);
+    Optional<Tamano> findByNombre(String nombre);
 
-    Optional<Tamaños> findById(Integer id);
+    Optional<Tamano> findById(Integer id);
 
 }

@@ -42,6 +42,8 @@
         <span v-if="seleccionada">Continuar → {{ seleccionada.nombre }}</span>
         <span v-else>Selecciona una sede</span>
       </button>
+
+      <button class="sede-logout" @click="cerrarSesion">Cerrar sesión</button>
     </div>
   </div>
 </template>
@@ -73,6 +75,11 @@ function confirmar() {
   localStorage.setItem('sede_nombre', seleccionada.value.nombre)
   const rol = localStorage.getItem('user_role')?.replace('ROLE_', '')
   router.push(rol === 'ADMIN' ? '/admin' : '/empleado')
+}
+
+function cerrarSesion() {
+  localStorage.clear()
+  router.push('/login')
 }
 </script>
 
@@ -198,6 +205,17 @@ function confirmar() {
   box-shadow: 0 6px 28px rgba(59,130,246,0.55);
 }
 .sede-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.sede-logout {
+  width: 100%; margin-top: 0.75rem; padding: 0.5rem;
+  background: none; border: none; cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.78rem; font-weight: 500; letter-spacing: 0.03em;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.dark .sede-logout  { color: #3a5a80; }
+.light .sede-logout { color: #5a80aa; }
+.sede-logout:hover  { opacity: 0.8; }
 
 .err-txt { color: #f87171; font-size: 0.82rem; text-align: center; padding: 0.5rem; font-weight: 500; }
 </style>

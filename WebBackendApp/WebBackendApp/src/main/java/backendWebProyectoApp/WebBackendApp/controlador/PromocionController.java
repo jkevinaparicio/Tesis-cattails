@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/promociones")
-@CrossOrigin("*")
 public class PromocionController {
 
     @Autowired

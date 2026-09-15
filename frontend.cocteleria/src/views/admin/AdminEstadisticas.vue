@@ -106,6 +106,34 @@
         </div>
       </div>
 
+      <!-- DOMICILIOS -->
+      <div class="fbox">
+        <p class="fep">🛵 Domicilios</p>
+        <div class="compare-grid">
+          <div class="compare-card">
+            <p class="compare-label">Total cobrado</p>
+            <p class="compare-val" style="color:var(--purple);">${{ Number(estadisticasDomicilio.totalDomicilio).toLocaleString() }}</p>
+          </div>
+          <div class="compare-card">
+            <p class="compare-label">Cantidad</p>
+            <p class="compare-val" style="color:var(--purple);">{{ estadisticasDomicilio.cantidad }}</p>
+          </div>
+          <div class="compare-card">
+            <p class="compare-label">Promedio por domicilio</p>
+            <p class="compare-val" style="color:var(--purple);">${{ Number(estadisticasDomicilio.promedio).toLocaleString() }}</p>
+          </div>
+          <div class="compare-card">
+            <p class="compare-label">% de las ganancias</p>
+            <p class="compare-val" style="color:var(--purple);">{{ estadisticasDomicilio.pctSobreTotal }}%</p>
+          </div>
+        </div>
+        <p v-if="estadisticasDomicilio.cantidad" style="font-size:0.78rem; color:var(--text3); margin-top:0.85rem;">
+          De esos pedidos, <strong style="color:var(--text2);">${{ Number(estadisticasDomicilio.totalProductosDomicilio).toLocaleString() }}</strong>
+          corresponden a productos y <strong style="color:var(--purple);">${{ Number(estadisticasDomicilio.totalDomicilio).toLocaleString() }}</strong> al valor del envío.
+        </p>
+        <div v-else class="empty" style="padding:0.5rem 0 0;">Sin domicilios en este período.</div>
+      </div>
+
       <div class="fbox" id="seccion-grafico">
         <p class="fep">Ganancias por día</p>
         <div class="chart-wrap">
@@ -248,10 +276,10 @@ onMounted(async () => {
   cargando.value = true
   try {
     const [v, s] = await Promise.all([
-      api('GET', '/ventas/todas').catch(() => []),
+      api('GET', '/ventas/todas?page=0&size=100000').catch(() => ({ content: [] })),
       api('GET', '/sedes/listar').catch(() => [])
     ])
-    todasVentas.value = v
+    todasVentas.value = v?.content ?? []
     sedes.value       = s
     aplicarFiltro()
   } finally {
@@ -272,7 +300,8 @@ onUnmounted(() => desconectar())
 async function cargar() {
   cargando.value = true
   try {
-    todasVentas.value = await api('GET', '/ventas/todas').catch(() => [])
+    const v = await api('GET', '/ventas/todas?page=0&size=100000').catch(() => ({ content: [] }))
+    todasVentas.value = v?.content ?? []
     aplicarFiltro()
   } finally {
     cargando.value = false
@@ -379,6 +408,20 @@ const tiposPedido = computed(() => {
   const lista    = Object.values(mapa).sort((a, b) => b.ventas - a.ventas)
   const totalGen = lista.reduce((acc, t) => acc + t.ventas, 0)
   return lista.map(t => ({ ...t, pct: totalGen > 0 ? Math.round(t.ventas / totalGen * 100) : 0 }))
+})
+
+// Desglose específico de los domicilios: cuánto es valor de envío puro
+// vs. cuánto de esos pedidos es venta de producto normal.
+const estadisticasDomicilio = computed(() => {
+  const domicilios = ventasFiltradas.value.filter(v => v.tipoPedido === 'DOMICILIO')
+  const totalDomicilio       = domicilios.reduce((acc, v) => acc + parseFloat(v.valorDomicilio || 0), 0)
+  const totalVentaDomicilios = domicilios.reduce((acc, v) => acc + parseFloat(v.total || 0), 0)
+  const totalProductosDomicilio = totalVentaDomicilios - totalDomicilio
+  const cantidad = domicilios.length
+  const promedio = cantidad > 0 ? Math.round(totalDomicilio / cantidad) : 0
+  const pctSobreTotal = totalGanancias.value > 0 ? Math.round(totalDomicilio / totalGanancias.value * 100) : 0
+
+  return { cantidad, totalDomicilio, totalProductosDomicilio, totalVentaDomicilios, promedio, pctSobreTotal }
 })
 
 const datosGrafico = computed(() => {
@@ -522,6 +565,13 @@ async function exportarPDF() {
       <table><tr><th>Tipo</th><th>Ventas</th><th>Total</th><th>%</th></tr>
         ${tiposPedido.value.map(t => `<tr><td>${t.tipo === 'LOCAL' ? 'Local' : 'Domicilio'}</td><td>${t.ventas}</td><td>$${Number(t.total).toLocaleString()}</td><td>${t.pct}%</td></tr>`).join('')}
       </table>
+      <h2>Domicilios</h2>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Total cobrado</div><div class="stat-val">$${Number(estadisticasDomicilio.value.totalDomicilio).toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">Cantidad</div><div class="stat-val">${estadisticasDomicilio.value.cantidad}</div></div>
+        <div class="stat"><div class="stat-label">Promedio</div><div class="stat-val">$${Number(estadisticasDomicilio.value.promedio).toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">% de ganancias</div><div class="stat-val">${estadisticasDomicilio.value.pctSobreTotal}%</div></div>
+      </div>
       <h2>Productos más vendidos</h2>
       <table><tr><th>Producto</th><th>Tamaño</th><th>Unidades</th><th>Ingresos</th></tr>
         ${topProductos.value.map(p => `<tr><td>${p.producto}</td><td>${p.tamano}</td><td>${p.cantidad}</td><td>$${Number(p.ingresos).toLocaleString()}</td></tr>`).join('')}

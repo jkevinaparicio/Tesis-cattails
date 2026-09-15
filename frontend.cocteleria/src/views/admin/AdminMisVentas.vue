@@ -108,9 +108,22 @@
           </div>
         </div>
 
-        <div class="modal-footer">
+        <div class="modal-footer" style="flex-direction:column; align-items:stretch; gap:10px;">
           <p class="modal-fecha">{{ ventaDetalle.fecha }}</p>
-          <div class="modal-total">
+          <div v-if="ventaDetalle.tipoPedido === 'DOMICILIO' && Number(ventaDetalle.valorDomicilio) > 0"
+               style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span style="font-size:0.78rem; color:var(--text3);">Subtotal productos</span>
+              <span style="font-size:0.85rem; color:var(--text2);">${{ subtotalProductosDetalle.toLocaleString() }}</span>
+            </div>
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span style="font-size:0.78rem; color:var(--text3);">🛵 Domicilio</span>
+              <span style="font-size:0.85rem; color:var(--purple); font-weight:600;">
+                ${{ Number(ventaDetalle.valorDomicilio).toLocaleString() }}
+              </span>
+            </div>
+          </div>
+          <div class="modal-total" style="align-self:flex-end;">
             <span class="ct-lbl">Total</span>
             <span class="ct-val">${{ Number(ventaDetalle.total).toLocaleString() }}</span>
           </div>
@@ -121,7 +134,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAdmin } from '@/composables/useAdmin'
 
 const { api, loading } = useAdmin()
@@ -133,6 +146,11 @@ const metodosMap = {
   NEQUI:       '📱 Nequi',
   BANCOLOMBIA: '🏦 Bancolombia',
 }
+
+const subtotalProductosDetalle = computed(() => {
+  if (!ventaDetalle.value?.detalles) return 0
+  return ventaDetalle.value.detalles.reduce((acc, d) => acc + Number(d.subtotal || 0), 0)
+})
 
 onMounted(cargar)
 

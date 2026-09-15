@@ -97,9 +97,21 @@
               </tr>
             </tbody>
           </table>
-          <div class="cart-total">
-            <span class="ct-lbl">Total estimado</span>
-            <span class="ct-val">${{ totalEstimado }}</span>
+
+          <div class="cart-total" style="flex-direction:column; align-items:flex-end; gap:2px;">
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span class="ct-lbl">Subtotal productos</span>
+              <span style="font-size:0.95rem; color:var(--text2);">${{ subtotalProductosFmt }}</span>
+            </div>
+            <div v-if="tipoPedido === 'DOMICILIO' && valorDomicilioNum > 0"
+              style="display:flex; gap:12px; align-items:baseline;">
+              <span class="ct-lbl">Domicilio</span>
+              <span style="font-size:0.95rem; color:var(--purple);">${{ valorDomicilioNum.toLocaleString() }}</span>
+            </div>
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span class="ct-lbl">Total estimado</span>
+              <span class="ct-val">${{ totalFinalFmt }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -130,17 +142,23 @@
           <div style="display:flex; gap:8px;">
             <button
               :class="['bsm', tipoPedido === 'LOCAL' ? 'be2' : 'bd']"
-              @click="tipoPedido = 'LOCAL'"
+              @click="cambiarTipoPedido('LOCAL')"
             >
               🏠 Local
             </button>
             <button
               :class="['bsm', tipoPedido === 'DOMICILIO' ? 'be2' : 'bd']"
-              @click="tipoPedido = 'DOMICILIO'"
+              @click="cambiarTipoPedido('DOMICILIO')"
             >
               🛵 Domicilio
             </button>
           </div>
+        </div>
+
+        <!-- Valor del domicilio: solo si el pedido es DOMICILIO -->
+        <div class="ff" v-if="tipoPedido === 'DOMICILIO'" style="max-width:180px;">
+          <label>Valor del domicilio</label>
+          <input v-model="valorDomicilio" type="number" min="0" placeholder="5000" />
         </div>
       </div>
     </div>
@@ -177,12 +195,13 @@ const esHoyPromo           = ref(false)
 const sedeNombre = localStorage.getItem('sede_nombre') || 'Sin sede'
 const sedeId     = parseInt(localStorage.getItem('sede_id'))
 
-const sel        = ref({ prodId: '', varId: '', cantidad: 1 })
-const msgSel     = ref('')
-const msg        = ref('')
-const msgOk      = ref(true)
-const metodoPago = ref('EFECTIVO')
-const tipoPedido = ref('LOCAL')
+const sel            = ref({ prodId: '', varId: '', cantidad: 1 })
+const msgSel         = ref('')
+const msg            = ref('')
+const msgOk          = ref(true)
+const metodoPago     = ref('EFECTIVO')
+const tipoPedido     = ref('LOCAL')
+const valorDomicilio = ref('')
 
 const metodos = [
   { value: 'EFECTIVO',    label: 'Efectivo',    icon: '💵' },
@@ -195,6 +214,11 @@ function setMsg(t, ok = true) {
   setTimeout(() => { msg.value = '' }, 4000)
 }
 
+function cambiarTipoPedido(t) {
+  tipoPedido.value = t
+  if (t === 'LOCAL') valorDomicilio.value = ''
+}
+
 function calcularSubtotal(item) {
   if (esHoyPromo.value && item.precioPromo && item.cantidad >= 2) {
     const pares = Math.floor(item.cantidad / 2) * 2
@@ -204,8 +228,9 @@ function calcularSubtotal(item) {
   return Number(item.precio * item.cantidad).toLocaleString()
 }
 
-const totalEstimado = computed(() => {
-  const total = carrito.value.reduce((acc, item) => {
+// suma cruda del carrito (sin domicilio), respetando la promo
+const subtotalProductosNum = computed(() =>
+  carrito.value.reduce((acc, item) => {
     if (esHoyPromo.value && item.precioPromo && item.cantidad >= 2) {
       const pares = Math.floor(item.cantidad / 2) * 2
       const resto = item.cantidad % 2
@@ -213,8 +238,16 @@ const totalEstimado = computed(() => {
     }
     return acc + item.precio * item.cantidad
   }, 0)
-  return Number(total).toLocaleString()
-})
+)
+
+const valorDomicilioNum = computed(() =>
+  tipoPedido.value === 'DOMICILIO' ? (parseFloat(valorDomicilio.value) || 0) : 0
+)
+
+const subtotalProductosFmt = computed(() => Number(subtotalProductosNum.value).toLocaleString())
+const totalFinalFmt = computed(() =>
+  Number(subtotalProductosNum.value + valorDomicilioNum.value).toLocaleString()
+)
 
 onMounted(async () => {
   cargandoInv.value = true
@@ -318,20 +351,26 @@ async function finalizar() {
   if (!sedeId)               { setMsg('Sin sede asignada', false); return }
   if (!carrito.value.length) { setMsg('Agrega al menos un producto', false); return }
 
+  if (tipoPedido.value === 'DOMICILIO' && (!valorDomicilio.value || parseFloat(valorDomicilio.value) < 0)) {
+    setMsg('Ingresa el valor del domicilio', false); return
+  }
+
   loading.value = true
   try {
     const res = await api('POST', '/ventas/crear', {
-      idSede:      sedeId,
-      metodoPago:  metodoPago.value,
-      tipoPedido:  tipoPedido.value,
-      esPromocion: esHoyPromo.value,
-      detalles:    carrito.value.map(it => ({
+      idSede:         sedeId,
+      metodoPago:     metodoPago.value,
+      tipoPedido:     tipoPedido.value,
+      esPromocion:    esHoyPromo.value,
+      valorDomicilio: tipoPedido.value === 'DOMICILIO' ? valorDomicilioNum.value : 0,
+      detalles:       carrito.value.map(it => ({
         idVariante: it.varianteId,
         cantidad:   it.cantidad
       }))
     })
     setMsg(`✓ Venta #${res.id} — Total: $${Number(res.total).toLocaleString()}`)
     carrito.value = []
+    valorDomicilio.value = ''
 
     const inv = await api('GET', `/inventario/sede/${sedeId}`).catch(() => [])
     inventarioSede.value = inv

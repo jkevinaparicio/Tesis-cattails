@@ -1,12 +1,12 @@
 package backendWebProyectoApp.WebBackendApp.entidades;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonFormat;
+import backendWebProyectoApp.WebBackendApp.entidades.FechaNegocioUtil;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -31,6 +31,9 @@ public class Venta {
 
     private BigDecimal total;
 
+    @Column(name = "valor_domicilio")
+    private BigDecimal valorDomicilio;
+
     @JsonManagedReference
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DetalleVenta> detalleVentas;
@@ -38,10 +41,21 @@ public class Venta {
     @Column(name = "local_date_time")
     private LocalDateTime fecha;
 
+    @Column(name = "fecha_negocio")
+    private LocalDate fechaNegocio;
+
     @Column(name = "metodo_pago")
     private String metodoPago;
 
     @Column(name = "tipo_pedido")
     private String tipoPedido;
 
+    @PrePersist
+    @PreUpdate
+    private void calcularFechaNegocio() {
+        if (this.fecha == null) {
+            this.fecha = LocalDateTime.now();
+        }
+        this.fechaNegocio = FechaNegocioUtil.calcular(this.fecha);
+    }
 }

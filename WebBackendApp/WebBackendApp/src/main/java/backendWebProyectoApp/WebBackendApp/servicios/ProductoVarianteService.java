@@ -3,7 +3,7 @@ package backendWebProyectoApp.WebBackendApp.servicios;
 import backendWebProyectoApp.WebBackendApp.dto.ProductoVarianteDTO;
 import backendWebProyectoApp.WebBackendApp.entidades.ProductoVariante;
 import backendWebProyectoApp.WebBackendApp.entidades.Productos;
-import backendWebProyectoApp.WebBackendApp.entidades.Tamaños;
+import backendWebProyectoApp.WebBackendApp.entidades.Tamano;
 import backendWebProyectoApp.WebBackendApp.repositorios.ProductoVarianteRepository;
 import backendWebProyectoApp.WebBackendApp.repositorios.ProductosRepository;
 import backendWebProyectoApp.WebBackendApp.repositorios.TamanoRepository;
@@ -24,12 +24,15 @@ public class ProductoVarianteService {
     @Autowired
     private TamanoRepository tamanoRepository;
 
+    @Autowired
+    private backendWebProyectoApp.WebBackendApp.repositorios.InventarioRepository inventarioRepository;
+
     public ProductoVariante crear(ProductoVarianteDTO dto) {
 
         Productos producto = productosRepository.findById(dto.getIdProducto())
                 .orElseThrow(() -> new RuntimeException("Producto no existe"));
 
-        Tamaños tamano = tamanoRepository.findById(dto.getIdTamano())
+        Tamano tamano = tamanoRepository.findById(dto.getIdTamano())
                 .orElseThrow(() -> new RuntimeException("Tamaño no existe"));
 
         boolean existe = repo.findByProducto_IdAndTamaño_Id(
@@ -74,7 +77,9 @@ public class ProductoVarianteService {
         return repo.save(v);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void eliminar(Integer id) {
+        inventarioRepository.deleteByVariante_Id(id);
         repo.deleteById(id);
     }
 }

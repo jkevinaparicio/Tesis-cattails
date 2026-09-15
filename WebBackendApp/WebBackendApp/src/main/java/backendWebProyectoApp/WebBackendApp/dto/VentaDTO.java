@@ -13,6 +13,7 @@ public class VentaDTO {
     private String usuario;
     private String sede;
     private BigDecimal total;
+    private BigDecimal valorDomicilio;
     private String metodoPago;
     private String tipoPedido;
 

@@ -2,6 +2,7 @@ package backendWebProyectoApp.WebBackendApp.seguridad;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -11,10 +12,11 @@ import java.util.List;
 @Component
 public class JwtUtil {
 
-    // 🔐 clave segura (mínimo 256 bits)
-    private final Key SECRET_KEY = Keys.hmacShaKeyFor(
-            "clave_secreta_muy_segura_123456789012".getBytes()
-    );
+    private final Key SECRET_KEY;
+
+    public JwtUtil(@Value("${app.jwt-secret}") String jwtSecret) {
+        this.SECRET_KEY = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    }
 
     public String generateToken(String correo, String role) {
 

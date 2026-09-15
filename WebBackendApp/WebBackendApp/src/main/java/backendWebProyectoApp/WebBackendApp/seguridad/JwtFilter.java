@@ -37,9 +37,20 @@ public class JwtFilter extends OncePerRequestFilter {
             String correo = jwtUtil.extractCorreo(token);
             List<String> roles = jwtUtil.extractRoles(token);
 
-            List<SimpleGrantedAuthority> authorities = roles.stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .toList();
+            List<SimpleGrantedAuthority> authorities = roles != null
+                    ? roles.stream()
+                            .flatMap(r -> {
+                                String rUpper = r.toUpperCase();
+                                String roleName = rUpper.startsWith("ROLE_") ? rUpper : "ROLE_" + rUpper;
+                                return java.util.stream.Stream.of(
+                                        new SimpleGrantedAuthority(r),
+                                        new SimpleGrantedAuthority(rUpper),
+                                        new SimpleGrantedAuthority(roleName)
+                                );
+                            })
+                            .distinct()
+                            .toList()
+                    : List.of();
 
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(
@@ -49,9 +60,8 @@ public class JwtFilter extends OncePerRequestFilter {
                     );
 
             SecurityContextHolder.getContext().setAuthentication(auth);
-            System.out.println("ROLES: " + roles);
-            System.out.println("AUTHORITIES: " + authorities);
         } catch (Exception e) {
+            System.err.println("Error validando JWT en JwtFilter: " + e.getMessage());
             SecurityContextHolder.clearContext();
         }
 
