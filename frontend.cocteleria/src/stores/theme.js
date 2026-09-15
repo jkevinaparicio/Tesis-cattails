@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useThemeStore = defineStore('theme', () => {
-  const theme = ref(localStorage.getItem('cattails_theme') || 'dark')
+  const theme = ref('light')
 
   function toggle() {
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
