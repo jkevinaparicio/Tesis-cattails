@@ -20,7 +20,9 @@ public class Categoria {
     @Column(nullable = false, unique = true)
     private String nombre;
 
+    @Column(name = "compartir_stock_por_tamano", nullable = false)
+    private boolean compartirStockPorTamano = false;
+
     @OneToMany
     private List<Productos> productos;
-
 }

@@ -29,4 +29,12 @@ public class ProductoVariante {
 
     @Column(name = "precio_promo")
     private BigDecimal precioPromo;
+
+    public Tamano getTamano() {
+        return this.tamaño;
+    }
+
+    public void setTamano(Tamano tamano) {
+        this.tamaño = tamano;
+    }
 }

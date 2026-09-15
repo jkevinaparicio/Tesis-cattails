@@ -1,10 +1,11 @@
 package backendWebProyectoApp.WebBackendApp.controlador;
 
+import backendWebProyectoApp.WebBackendApp.dto.InventarioDTO;
 import backendWebProyectoApp.WebBackendApp.dto.InventarioRequestDTO;
 import backendWebProyectoApp.WebBackendApp.dto.MovimientoStockDTO;
 import backendWebProyectoApp.WebBackendApp.entidades.Inventario;
+import backendWebProyectoApp.WebBackendApp.entidades.InventarioTamano;
 import backendWebProyectoApp.WebBackendApp.servicios.InventarioService;
-import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,13 +18,13 @@ public class InventarioController {
     @Autowired
     private InventarioService service;
 
-    // 🟢 AUMENTAR STOCK
+    // 🟢 AUMENTAR STOCK (POR VARIANTE O DINÁMICO)
     @PostMapping("/aumentar")
     public void aumentarStock(@RequestBody MovimientoStockDTO dto) {
         service.aumentarStock(dto.getVarianteId(), dto.getSedeId(), dto.getCantidad());
     }
 
-    // 🔴 DISMINUIR STOCK
+    // 🔴 DISMINUIR STOCK (POR VARIANTE O DINÁMICO)
     @PostMapping("/disminuir")
     public void disminuirStock(@RequestBody MovimientoStockDTO dto) {
         service.descontarStock(dto.getVarianteId(), dto.getSedeId(), dto.getCantidad());
@@ -54,5 +55,45 @@ public class InventarioController {
     public Inventario obtenerStock(@RequestParam Integer varianteId,
                                    @RequestParam Integer sedeId) {
         return service.obtenerStock(varianteId, sedeId);
+    }
+
+    // ==========================================
+    // 🍹 INVENTARIO COMPARTIDO POR TAMAÑO
+    // ==========================================
+
+    @GetMapping("/tamano/sede/{idSede}")
+    public List<InventarioTamano> listarTamanoPorSede(@PathVariable Integer idSede) {
+        return service.listarTamanoPorSede(idSede);
+    }
+
+    @PostMapping("/tamano/crear")
+    public InventarioTamano crearTamano(@RequestBody InventarioDTO dto) {
+        return service.crearOActualizarTamano(dto.getIdTamano(), dto.getIdSede(), dto.getStock());
+    }
+
+    @PostMapping("/tamano/aumentar")
+    public void aumentarStockTamano(@RequestBody MovimientoStockDTO dto) {
+        service.aumentarStockTamano(dto.getTamanoId(), dto.getSedeId(), dto.getCantidad());
+    }
+
+    @PostMapping("/tamano/disminuir")
+    public void disminuirStockTamano(@RequestBody MovimientoStockDTO dto) {
+        service.descontarStockTamano(dto.getTamanoId(), dto.getSedeId(), dto.getCantidad());
+    }
+
+    @DeleteMapping("/tamano/sede/{idSede}/tamano/{idTamano}")
+    public String eliminarTamanoDeSede(
+            @PathVariable Integer idSede,
+            @PathVariable Integer idTamano) {
+
+        service.eliminarTamanoDeSede(idTamano, idSede);
+        return "Inventario de tamaño eliminado de la sede";
+    }
+
+    @GetMapping("/tamano/stock")
+    public InventarioTamano obtenerStockTamano(
+            @RequestParam Integer tamanoId,
+            @RequestParam Integer sedeId) {
+        return service.obtenerStockTamano(tamanoId, sedeId);
     }
 }

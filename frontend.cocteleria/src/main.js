@@ -12,8 +12,8 @@ app.use(router)
 router.afterEach(() => {
   const token = localStorage.getItem('jwt_token')
   if (token) {
-    const { iniciar } = useWebSocket()
-    iniciar()
+    const { conectar } = useWebSocket()
+    conectar()
   }
 })
 

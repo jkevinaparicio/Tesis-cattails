@@ -24,6 +24,9 @@ public class ProductoVarianteService {
     @Autowired
     private TamanoRepository tamanoRepository;
 
+    @Autowired
+    private backendWebProyectoApp.WebBackendApp.repositorios.InventarioRepository inventarioRepository;
+
     public ProductoVariante crear(ProductoVarianteDTO dto) {
 
         Productos producto = productosRepository.findById(dto.getIdProducto())
@@ -74,7 +77,9 @@ public class ProductoVarianteService {
         return repo.save(v);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void eliminar(Integer id) {
+        inventarioRepository.deleteByVariante_Id(id);
         repo.deleteById(id);
     }
 }

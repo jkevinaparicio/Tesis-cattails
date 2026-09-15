@@ -14,5 +14,10 @@ public interface ProductoVarianteRepository extends JpaRepository<ProductoVarian
     Optional<ProductoVariante> findByProducto_IdAndTamaño_Id(Integer productoId, Integer tamanoId);
 
     List<ProductoVariante> findByProducto_Id(Integer idProducto);
-    
+
+    List<ProductoVariante> findByTamaño_Id(Integer tamanoId);
+
+    void deleteByTamaño_Id(Integer tamanoId);
+
+    void deleteByProducto_Id(Integer productoId);
 }

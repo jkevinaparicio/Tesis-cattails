@@ -11,5 +11,6 @@ public interface InventarioRepository extends JpaRepository<Inventario, Integer>
     Optional<Inventario> findByVariante_IdAndSede_Id(Integer varianteId, Integer sedeId);
 
     List<Inventario> findBySede_Id(Integer sedeId);
-
+    List<Inventario> findByVariante_Id(Integer varianteId);
+    void deleteByVariante_Id(Integer varianteId);
 }

@@ -91,7 +91,7 @@ public class VentaServicio {
                     .orElseThrow(() -> new RuntimeException("Variante no existe"));
 
             inventarioService.descontarStock(
-                    variante.getId(),
+                    variante,
                     sede.getId(),
                     item.getCantidad()
             );
@@ -207,7 +207,7 @@ public class VentaServicio {
                     ).orElseThrow(() -> new RuntimeException("Variante no existe"));
 
             inventarioService.aumentarStock(
-                    varianteOld.getId(),
+                    varianteOld,
                     venta.getSede().getId(),
                     old.getCantidad()
             );
@@ -246,8 +246,8 @@ public class VentaServicio {
             ProductoVariante variante = varianteRepository.findById(dt.getIdVariante())
                     .orElseThrow(() -> new RuntimeException("Variante no existe"));
 
-            inventarioService.validarStock(variante.getId(), venta.getSede().getId(), dt.getCantidad());
-            inventarioService.descontarStock(variante.getId(), venta.getSede().getId(), dt.getCantidad());
+            inventarioService.validarStock(variante, venta.getSede().getId(), dt.getCantidad());
+            inventarioService.descontarStock(variante, venta.getSede().getId(), dt.getCantidad());
 
             BigDecimal subtotal;
 
@@ -333,7 +333,7 @@ public class VentaServicio {
                     ).orElseThrow(() -> new RuntimeException("Variante no existe"));
 
             inventarioService.aumentarStock(
-                    variante.getId(),
+                    variante,
                     venta.getSede().getId(),
                     d.getCantidad()
             );
