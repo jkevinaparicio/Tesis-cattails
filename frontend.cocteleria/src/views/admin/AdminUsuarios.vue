@@ -2,7 +2,7 @@
   <div>
     <div class="ph">
       <h2 class="sec-t">Usuarios</h2>
-      <button class="bpri" @click="showForm = !showForm">+ Crear usuario</button>
+      <button class="bpri" @click="abrirCrear">+ Crear usuario</button>
     </div>
 
     <!-- USUARIOS CONECTADOS -->
@@ -37,73 +37,6 @@
           {{ correo }}
         </span>
       </div>
-    </div>
-
-    <!-- FORM CREAR -->
-    <div v-if="showForm" class="fbox">
-      <p class="fep">POST /usuarios/crear</p>
-      <div class="frow">
-        <div class="ff"><label>Nombre</label><input v-model="form.nombre" placeholder="Juan"/></div>
-        <div class="ff"><label>Apellido</label><input v-model="form.apellido" placeholder="Pérez"/></div>
-      </div>
-      <div class="frow">
-        <div class="ff">
-          <label>Cédula (ID del usuario)</label>
-          <input v-model="form.idUsuario" type="number" placeholder="1234567890"/>
-        </div>
-        <div class="ff">
-          <label>Correo completo</label>
-          <input v-model="form.correo" placeholder="juan.perez@cattails.com"/>
-        </div>
-      </div>
-      <div class="frow">
-        <div class="ff">
-          <label>Contraseña</label>
-          <input v-model="form.contraseña" type="password" placeholder="••••••"/>
-        </div>
-        <div class="ff">
-          <label>Rol</label>
-          <select v-model="form.rolId">
-            <option value="1">Admin</option>
-            <option value="2">Empleado</option>
-          </select>
-        </div>
-      </div>
-      <div class="fact">
-        <button class="bpri" @click="crear">Guardar</button>
-        <button class="bsm bd" @click="showForm = false">Cancelar</button>
-      </div>
-      <p v-if="msgCrear" class="fmsg" :class="msgCrearOk ? 'ok' : 'err'">{{ msgCrear }}</p>
-    </div>
-
-    <!-- FORM EDITAR -->
-    <div v-if="editando" class="fbox">
-      <p class="fep">PUT /usuarios/modificar/{{ editForm.idUsuario }}</p>
-      <div class="frow">
-        <div class="ff"><label>Nombre</label><input v-model="editForm.nombre"/></div>
-        <div class="ff"><label>Apellido</label><input v-model="editForm.apellido"/></div>
-      </div>
-      <div class="frow">
-        <div class="ff"><label>Correo</label><input v-model="editForm.correo"/></div>
-        <div class="ff">
-          <label>Contraseña nueva (opcional)</label>
-          <input v-model="editForm.contraseña" type="password" placeholder="Dejar vacío para no cambiar"/>
-        </div>
-      </div>
-      <div class="frow s1">
-        <div class="ff">
-          <label>Rol</label>
-          <select v-model="editForm.rolId">
-            <option value="1">Admin</option>
-            <option value="2">Empleado</option>
-          </select>
-        </div>
-      </div>
-      <div class="fact">
-        <button class="bpri" @click="guardarEdicion">Guardar cambios</button>
-        <button class="bsm bd" @click="editando = null">Cancelar</button>
-      </div>
-      <p v-if="msgEditar" class="fmsg" :class="msgEditarOk ? 'ok' : 'err'">{{ msgEditar }}</p>
     </div>
 
     <!-- ✅ BUSCADOR -->
@@ -187,11 +120,11 @@
             </td>
             <td>
               <div class="btn-r">
-                <button class="bsm be2" @click="iniciarEdicion(u)">Editar</button>
+                <button class="bsm be2" @click="abrirEditar(u)">Editar</button>
                 <button
                   class="bsm"
                   :class="u.activo === false ? 'be2' : 'bd'"
-                  @click="toggleActivo(u)"
+                  @click="abrirConfirmToggle(u)"
                 >
                   {{ u.activo === false ? 'Activar' : 'Desactivar' }}
                 </button>
@@ -201,11 +134,136 @@
         </tbody>
       </table>
     </div>
+
+    <!-- ============ MODAL: CREAR USUARIO ============ -->
+    <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
+      <div class="modal-box modal-lg">
+        <div class="modal-header">
+          <p class="modal-title">+ Crear usuario</p>
+          <button class="modal-close" @click="showForm = false">✕</button>
+        </div>
+
+        <div class="modal-body-pad modal-scroll">
+          <div class="frow">
+            <div class="ff"><label>Nombre</label><input v-model="form.nombre" placeholder="Juan"/></div>
+            <div class="ff"><label>Apellido</label><input v-model="form.apellido" placeholder="Pérez"/></div>
+          </div>
+          <div class="frow">
+            <div class="ff">
+              <label>Cédula (ID del usuario)</label>
+              <input v-model="form.idUsuario" type="number" placeholder="1234567890"/>
+            </div>
+            <div class="ff">
+              <label>Correo completo</label>
+              <input v-model="form.correo" placeholder="juan.perez@cattails.com"/>
+            </div>
+          </div>
+          <div class="frow">
+            <div class="ff">
+              <label>Contraseña</label>
+              <input v-model="form.contraseña" type="password" placeholder="••••••"/>
+            </div>
+            <div class="ff">
+              <label>Rol</label>
+              <select v-model="form.rolId">
+                <option value="1">Admin</option>
+                <option value="2">Empleado</option>
+              </select>
+            </div>
+          </div>
+
+          <p v-if="modalCrear.error" class="modal-err">{{ modalCrear.error }}</p>
+        </div>
+
+        <div class="modal-footer-pad">
+          <button class="bsm bd" @click="showForm = false">Cancelar</button>
+          <button class="bpri" :disabled="guardando" @click="crear">
+            {{ guardando ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MODAL: EDITAR USUARIO ============ -->
+    <div v-if="editando" class="modal-overlay" @click.self="editando = null">
+      <div class="modal-box modal-lg">
+        <div class="modal-header">
+          <p class="modal-title">Editar usuario — {{ editForm.idUsuario }}</p>
+          <button class="modal-close" @click="editando = null">✕</button>
+        </div>
+
+        <div class="modal-body-pad modal-scroll">
+          <div class="frow">
+            <div class="ff"><label>Nombre</label><input ref="inputEditar" v-model="editForm.nombre"/></div>
+            <div class="ff"><label>Apellido</label><input v-model="editForm.apellido"/></div>
+          </div>
+          <div class="frow">
+            <div class="ff"><label>Correo</label><input v-model="editForm.correo"/></div>
+            <div class="ff">
+              <label>Contraseña nueva (opcional)</label>
+              <input v-model="editForm.contraseña" type="password" placeholder="Dejar vacío para no cambiar"/>
+            </div>
+          </div>
+          <div class="frow s1">
+            <div class="ff">
+              <label>Rol</label>
+              <select v-model="editForm.rolId">
+                <option value="1">Admin</option>
+                <option value="2">Empleado</option>
+              </select>
+            </div>
+          </div>
+
+          <p v-if="modalEditar.error" class="modal-err">{{ modalEditar.error }}</p>
+        </div>
+
+        <div class="modal-footer-pad">
+          <button class="bsm bd" @click="editando = null">Cancelar</button>
+          <button class="bpri" :disabled="guardando" @click="guardarEdicion">
+            {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MODAL: CONFIRMAR ACTIVAR/DESACTIVAR ============ -->
+    <div v-if="modalConfirm" class="modal-overlay" @click.self="modalConfirm = null">
+      <div class="modal-box modal-sm">
+        <div class="modal-header">
+          <p class="modal-title" :style="{ color: modalConfirm.nuevoEstado ? 'var(--ok)' : 'var(--err)' }">
+            {{ modalConfirm.nuevoEstado ? '✓ Activar usuario' : '⚠ Desactivar usuario' }}
+          </p>
+          <button class="modal-close" @click="modalConfirm = null">✕</button>
+        </div>
+
+        <div class="modal-body-pad">
+          <p class="modal-target">
+            ¿{{ modalConfirm.nuevoEstado ? 'Activar' : 'Desactivar' }} a {{ modalConfirm.usuario.nombre }} {{ modalConfirm.usuario.apellido }}?
+          </p>
+          <p v-if="!modalConfirm.nuevoEstado" class="c-muted" style="font-size:0.8rem; margin-top:8px;">
+            El usuario no podrá iniciar sesión mientras esté desactivado, pero su historial se conserva.
+          </p>
+          <p v-if="modalConfirm.error" class="modal-err">{{ modalConfirm.error }}</p>
+        </div>
+
+        <div class="modal-footer-pad">
+          <button class="bsm bd" @click="modalConfirm = null">Cancelar</button>
+          <button class="bpri"
+                  :style="!modalConfirm.nuevoEstado ? 'background:var(--err); border-color:var(--err);' : ''"
+                  :disabled="guardando" @click="confirmarToggle">
+            {{ guardando ? 'Guardando...' : (modalConfirm.nuevoEstado ? 'Sí, activar' : 'Sí, desactivar') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST GLOBAL -->
+    <div v-if="toast" class="toast" :class="toast.ok ? 'ok' : 'err'">{{ toast.texto }}</div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAdmin } from '@/composables/useAdmin'
 import { useWebSocket } from '@/composables/useWebSocket'
 
@@ -216,7 +274,8 @@ const usuarios   = ref([])
 const conectados = ref([])
 const showForm   = ref(false)
 const editando   = ref(null)
-const busqueda   = ref('')   // ✅ NUEVO
+const busqueda   = ref('')
+const inputEditar = ref(null)
 
 const usuariosFiltrados = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
@@ -239,11 +298,16 @@ const editForm = ref({
   correo: '', contraseña: '', rolId: 2
 })
 
-const msgCrear    = ref(''); const msgCrearOk  = ref(true)
-const msgEditar   = ref(''); const msgEditarOk = ref(true)
+const modalCrear   = ref({ error: '' })
+const modalEditar  = ref({ error: '' })
+const modalConfirm = ref(null)
+const guardando    = ref(false)
+const toast        = ref(null)
 
-function setMsgCrear(t, ok = true)  { msgCrear.value  = t; msgCrearOk.value  = ok; setTimeout(() => msgCrear.value  = '', 3500) }
-function setMsgEditar(t, ok = true) { msgEditar.value = t; msgEditarOk.value = ok; setTimeout(() => msgEditar.value = '', 3500) }
+function setToast(texto, ok = true) {
+  toast.value = { texto, ok }
+  setTimeout(() => { toast.value = null }, 3000)
+}
 
 function formatFecha(fecha) {
   if (!fecha) return 'Nunca'
@@ -272,7 +336,7 @@ async function cargar() {
   try {
     usuarios.value = await api('GET', '/usuarios')
   } catch (e) {
-    setMsgCrear(e.message, false)
+    setToast(e.message, false)
   } finally {
     loading.value = false
   }
@@ -286,12 +350,19 @@ async function cargarConectados() {
   }
 }
 
-async function crear() {
-  if (!form.value.idUsuario)  { setMsgCrear('La cédula es obligatoria', false); return }
-  if (!form.value.nombre)     { setMsgCrear('El nombre es obligatorio', false); return }
-  if (!form.value.correo)     { setMsgCrear('El correo es obligatorio', false); return }
-  if (!form.value.contraseña) { setMsgCrear('La contraseña es obligatoria', false); return }
+function abrirCrear() {
+  showForm.value = true
+  form.value = { idUsuario: '', nombre: '', apellido: '', correo: '', contraseña: '', rolId: 2 }
+  modalCrear.value = { error: '' }
+}
 
+async function crear() {
+  if (!form.value.idUsuario)  { modalCrear.value.error = 'La cédula es obligatoria'; return }
+  if (!form.value.nombre)     { modalCrear.value.error = 'El nombre es obligatorio'; return }
+  if (!form.value.correo)     { modalCrear.value.error = 'El correo es obligatorio'; return }
+  if (!form.value.contraseña) { modalCrear.value.error = 'La contraseña es obligatoria'; return }
+
+  guardando.value = true
   try {
     await api('POST', '/usuarios/crear', {
       idUsuario:  parseInt(form.value.idUsuario),
@@ -301,16 +372,17 @@ async function crear() {
       contraseña: form.value.contraseña,
       rol:        { id: parseInt(form.value.rolId) }
     })
-    setMsgCrear('Usuario creado correctamente')
     showForm.value = false
-    form.value = { idUsuario: '', nombre: '', apellido: '', correo: '', contraseña: '', rolId: 2 }
+    setToast('✓ Usuario creado correctamente')
     cargar()
   } catch (e) {
-    setMsgCrear(e.response?.data || e.message, false)
+    modalCrear.value.error = e.response?.data || e.message || 'Error al crear'
+  } finally {
+    guardando.value = false
   }
 }
 
-function iniciarEdicion(u) {
+async function abrirEditar(u) {
   editando.value = u.idUsuario
   editForm.value = {
     idUsuario:  u.idUsuario,
@@ -320,11 +392,13 @@ function iniciarEdicion(u) {
     contraseña: '',
     rolId:      u.rol?.id || 2
   }
-  showForm.value = false
+  modalEditar.value = { error: '' }
+  await nextTick()
+  inputEditar.value?.focus()
 }
 
 async function guardarEdicion() {
-  if (!editForm.value.nombre) { setMsgEditar('El nombre es obligatorio', false); return }
+  if (!editForm.value.nombre) { modalEditar.value.error = 'El nombre es obligatorio'; return }
 
   const body = {
     nombre:   editForm.value.nombre,
@@ -334,21 +408,27 @@ async function guardarEdicion() {
   }
   if (editForm.value.contraseña) body.contraseña = editForm.value.contraseña
 
+  guardando.value = true
   try {
     await api('PUT', `/usuarios/modificar/${editForm.value.idUsuario}`, body)
-    setMsgEditar('Cambios guardados')
-    setTimeout(() => { editando.value = null }, 1500)
+    editando.value = null
+    setToast('✓ Cambios guardados')
     cargar()
   } catch (e) {
-    setMsgEditar(e.response?.data || e.message, false)
+    modalEditar.value.error = e.response?.data || e.message || 'Error al guardar'
+  } finally {
+    guardando.value = false
   }
 }
 
-async function toggleActivo(u) {
+function abrirConfirmToggle(u) {
   const nuevoEstado = u.activo === false ? true : false
-  const accion = nuevoEstado ? 'activar' : 'desactivar'
-  if (!confirm(`¿Deseas ${accion} a ${u.nombre}?`)) return
+  modalConfirm.value = { usuario: u, nuevoEstado, error: '' }
+}
 
+async function confirmarToggle() {
+  const { usuario: u, nuevoEstado } = modalConfirm.value
+  guardando.value = true
   try {
     await api('PUT', `/usuarios/modificar/${u.idUsuario}`, {
       nombre:   u.nombre,
@@ -357,12 +437,84 @@ async function toggleActivo(u) {
       rol:      { id: u.rol?.id || 2 },
       activo:   nuevoEstado
     })
-    setMsgCrear(`Usuario ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`)
+    modalConfirm.value = null
+    setToast(`✓ Usuario ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`)
     cargar()
   } catch (e) {
-    setMsgCrear(e.response?.data || e.message, false)
+    modalConfirm.value.error = e.response?.data || e.message || 'Error al actualizar'
+  } finally {
+    guardando.value = false
   }
 }
 </script>
 
 <style scoped src="@/assets/admin.css" />
+<style scoped>
+/* ---------- MODALES ---------- */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%; box-shadow: var(--shadow-lg);
+  overflow: hidden; animation: modal-in 0.18s ease;
+  display: flex; flex-direction: column;
+}
+.modal-sm { max-width: 420px; }
+.modal-lg { max-width: 640px; max-height: 85vh; }
+@keyframes modal-in {
+  from { opacity:0; transform: translateY(14px) scale(0.97); }
+  to   { opacity:1; transform: translateY(0) scale(1); }
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border2);
+  gap: 12px;
+  flex-shrink: 0;
+}
+.modal-title { font-size: 0.98rem; font-weight: 700; color: var(--text); margin: 0; }
+.modal-close {
+  background: rgba(244,63,94,0.1);
+  border: 1px solid rgba(244,63,94,0.3);
+  color: var(--err); border-radius: var(--radius-xs);
+  cursor: pointer; padding: 3px 9px; font-size: 0.85rem;
+  font-family: var(--font); font-weight: 600; transition: all 0.15s; flex-shrink: 0;
+}
+.modal-close:hover { background: rgba(244,63,94,0.2); }
+.modal-body-pad { padding: 1.25rem; }
+.modal-scroll { overflow-y: auto; }
+.modal-target { font-size: 0.92rem; font-weight: 600; color: var(--purple); margin: 0; }
+.modal-err {
+  margin-top: 10px; font-size: 0.82rem; color: var(--err); font-weight: 500;
+}
+.modal-footer-pad {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border2);
+  background: var(--bg3);
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ---------- TOAST ---------- */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  padding: 10px 20px; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 600;
+  z-index: 1100; box-shadow: var(--shadow-lg);
+  animation: toast-in 0.2s ease;
+}
+.toast.ok  { background: var(--ok);  color: #fff; }
+.toast.err { background: var(--err); color: #fff; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+</style>
