@@ -12,6 +12,7 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -29,30 +30,49 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                                         Authentication authentication) throws IOException {
 
         OAuth2User oauth2User = (OAuth2User) authentication.getPrincipal();
-        String correoGoogle = oauth2User.getAttribute("email"); // correo real de Google
+        String correoGoogle = oauth2User.getAttribute("email");
 
-        // 1. ¿Existe en la BD?
+        if (correoGoogle == null || correoGoogle.isBlank()) {
+            response.sendRedirect(frontendUrl + "/login?error=sin_correo");
+            return;
+        }
+
+        if (!correoVerificadoPorGoogle(oauth2User)) {
+            response.sendRedirect(frontendUrl + "/login?error=correo_no_verificado");
+            return;
+        }
+
         Usuario usuario = usuarioRepository.findByCorreo(correoGoogle)
                 .orElse(null);
 
         if (usuario == null) {
-            // No registrado por el admin → rechazar
             response.sendRedirect(frontendUrl + "/login?error=no_registrado");
             return;
         }
 
-        // 2. ¿Está activo?
         if (Boolean.FALSE.equals(usuario.getActivo())) {
             response.sendRedirect(frontendUrl + "/login?error=inactivo");
             return;
         }
 
-        // 3. Todo bien → generar JWT propio (igual que el login clásico)
+        usuario.setUltimaConexion(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
         String rol   = usuario.getRol().getNombre();
         String token = jwtUtil.generateToken(correoGoogle, rol);
 
-        // 4. Redirigir al frontend con el token en la URL
-        //    El frontend lo captura y lo guarda en localStorage
         response.sendRedirect(frontendUrl + "/oauth2/callback?token=" + token + "&rol=" + rol);
+    }
+
+    private boolean correoVerificadoPorGoogle(OAuth2User oauth2User) {
+        Object valor = oauth2User.getAttribute("email_verified");
+
+        if (valor instanceof Boolean b) {
+            return b;
+        }
+        if (valor instanceof String s) {
+            return Boolean.parseBoolean(s);
+        }
+        return false;
     }
 }
