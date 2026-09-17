@@ -90,7 +90,7 @@
             <td>
               <div class="btn-r">
                 <button class="bsm be2" @click="verDetalle(v)">Ver detalle</button>
-                <button class="bsm bd"  @click="eliminar(v.id)">Eliminar</button>
+                <button class="bsm bd"  @click="abrirConfirmEliminar(v)">Eliminar</button>
               </div>
             </td>
           </tr>
@@ -104,9 +104,9 @@
       <button class="bsm bd" :disabled="pagina >= totalPaginas - 1" @click="irAPagina(pagina + 1)">Siguiente ›</button>
     </div>
 
-    <!-- MODAL -->
+    <!-- MODAL: VER DETALLE -->
     <div v-if="ventaDetalle" class="modal-overlay" @click.self="ventaDetalle = null">
-      <div class="modal-box">
+      <div class="modal-box" style="max-width:640px;">
         <div class="modal-header">
           <div>
             <p class="modal-title">
@@ -177,6 +177,42 @@
         </div>
       </div>
     </div>
+
+    <!-- MODAL: CONFIRMAR ELIMINACIÓN -->
+    <div v-if="modalConfirm" class="modal-overlay" @click.self="modalConfirm = null">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+          <p class="modal-title" style="color:var(--err);">⚠ Eliminar venta</p>
+          <button class="modal-close" @click="modalConfirm = null">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding:1.25rem;">
+          <p style="font-size:0.92rem; font-weight:600; color:var(--purple); margin:0;">
+            ¿Eliminar la venta #{{ modalConfirm.venta.id }}?
+          </p>
+          <p class="c-muted" style="font-size:0.8rem; margin-top:8px;">
+            {{ modalConfirm.venta.usuario }} — {{ modalConfirm.venta.sede }} — ${{ Number(modalConfirm.venta.total).toLocaleString() }}
+          </p>
+          <p class="c-muted" style="font-size:0.8rem; margin-top:4px;">
+            El stock de los productos vendidos se devuelve automáticamente al inventario. Esta acción no se puede deshacer.
+          </p>
+          <p v-if="modalConfirm.error" style="margin-top:10px; font-size:0.82rem; color:var(--err); font-weight:500;">
+            {{ modalConfirm.error }}
+          </p>
+        </div>
+
+        <div class="modal-footer" style="justify-content:flex-end; gap:10px;">
+          <button class="bsm bd" @click="modalConfirm = null">Cancelar</button>
+          <button class="bpri" style="background:var(--err); border-color:var(--err);"
+                  :disabled="eliminando" @click="confirmarEliminacion">
+            {{ eliminando ? 'Eliminando...' : 'Sí, eliminar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div v-if="toast" class="toast" :class="toast.ok ? 'ok' : 'err'">{{ toast.texto }}</div>
   </div>
 </template>
 
@@ -198,14 +234,23 @@ const filtroSede     = ref('')
 const filtroFecha    = ref('')
 const ventaDetalle   = ref(null)
 
-const pagina        = ref(0)
-const totalPaginas   = ref(0)
-const totalElementos = ref(0)
+const pagina          = ref(0)
+const totalPaginas    = ref(0)
+const totalElementos  = ref(0)
+
+const modalConfirm = ref(null)
+const eliminando   = ref(false)
+const toast        = ref(null)
 
 const metodosMap = {
   EFECTIVO:    '💵 Efectivo',
   NEQUI:       '📱 Nequi',
   BANCOLOMBIA: '🏦 Bancolombia',
+}
+
+function setToast(texto, ok = true) {
+  toast.value = { texto, ok }
+  setTimeout(() => { toast.value = null }, 3000)
 }
 
 const totalPagina = computed(() =>
@@ -227,7 +272,6 @@ onMounted(async () => {
   await cargar()
 
   conectar((ventaNueva) => {
-    // solo la agregamos arriba si estamos viendo la primera página sin filtros
     const sinFiltros = !filtroUsuario.value && !filtroSede.value && !filtroFecha.value
     if (sinFiltros && pagina.value === 0) {
       const existe = ventas.value.find(v => v.id === ventaNueva.id)
@@ -238,7 +282,6 @@ onMounted(async () => {
 
 onUnmounted(() => desconectar())
 
-// aplica la paginación server-side según el/los filtro(s) activos
 async function aplicarPagina() {
   loading.value = true
   try {
@@ -258,9 +301,9 @@ async function aplicarPagina() {
     }
 
     const res = await api('GET', url)
-    ventas.value        = res.content ?? []
-    totalPaginas.value   = res.totalPages ?? 0
-    totalElementos.value = res.totalElements ?? ventas.value.length
+    ventas.value          = res.content ?? []
+    totalPaginas.value    = res.totalPages ?? 0
+    totalElementos.value  = res.totalElements ?? ventas.value.length
   } catch {
     ventas.value = []
     totalPaginas.value = 0
@@ -286,7 +329,6 @@ async function filtrarUsuario() {
   await aplicarPagina()
 }
 
-// combina sede + fecha; si no hay ninguno de los dos, cae al listado general
 async function filtrarPorFechaOSede() {
   filtroUsuario.value = ''
   pagina.value        = 0
@@ -305,12 +347,22 @@ function irAPagina(nueva) {
   aplicarPagina()
 }
 
-async function eliminar(id) {
-  if (!confirm('¿Eliminar esta venta?')) return
+function abrirConfirmEliminar(v) {
+  modalConfirm.value = { venta: v, error: '' }
+}
+
+async function confirmarEliminacion() {
+  eliminando.value = true
   try {
-    await api('DELETE', `/ventas/eliminar/${id}`)
+    await api('DELETE', `/ventas/eliminar/${modalConfirm.value.venta.id}`)
+    modalConfirm.value = null
+    setToast('✓ Venta eliminada, stock devuelto al inventario')
     await aplicarPagina()
-  } catch (e) { alert(e.message) }
+  } catch (e) {
+    modalConfirm.value.error = e.response?.data || e.message || 'Error al eliminar'
+  } finally {
+    eliminando.value = false
+  }
 }
 
 function verDetalle(v) {
@@ -331,7 +383,7 @@ function verDetalle(v) {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  width: 100%; max-width: 640px;
+  width: 100%;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: modal-in 0.2s ease;
@@ -413,5 +465,19 @@ function verDetalle(v) {
   font-size: 0.85rem;
   color: var(--text2);
   font-weight: 500;
+}
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  padding: 10px 20px; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 600;
+  z-index: 1100; box-shadow: var(--shadow-lg);
+  animation: toast-in 0.2s ease;
+}
+.toast.ok  { background: var(--ok);  color: #fff; }
+.toast.err { background: var(--err); color: #fff; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 </style>
