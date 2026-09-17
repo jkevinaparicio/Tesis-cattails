@@ -314,6 +314,7 @@
       </div>
     </div>
 
+    <!-- ============ MODAL: CONFIRMAR ELIMINACIÓN ============ -->
     <div v-if="modalConfirm" class="modal-overlay" @click.self="modalConfirm = null">
       <div class="modal-box modal-sm">
         <div class="modal-header">
@@ -340,6 +341,8 @@
         </div>
       </div>
     </div>
+
+    <!-- TOAST GLOBAL -->
     <div v-if="toast" class="toast" :class="toast.ok ? 'ok' : 'err'">{{ toast.texto }}</div>
   </div>
 </template>
@@ -436,6 +439,7 @@ async function onProdBloqueChange() {
 }
 
 async function guardarBloque() {
+  // solo manda las que de verdad cambiaron de precio
   const cambiadas = bloqueForm.value.variantes.filter(v =>
     v.precioNuevo !== '' && v.precioNuevo !== null && Number(v.precioNuevo) !== Number(v.precio)
   )
@@ -629,6 +633,7 @@ async function confirmarEliminacion() {
   flex-shrink: 0;
 }
 
+/* ---------- TOAST ---------- */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   padding: 10px 20px; border-radius: 8px;
