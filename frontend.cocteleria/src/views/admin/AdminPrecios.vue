@@ -2,7 +2,10 @@
   <div>
     <div class="ph">
       <h2 class="sec-t">Variantes y Precios</h2>
-      <button class="bpri" @click="abrirCrear">+ Asignar precios</button>
+      <div style="display:flex; gap:8px;">
+        <button class="bsm be2" @click="abrirEditarBloque">✎ Editar precios por producto</button>
+        <button class="bpri" @click="abrirCrear">+ Asignar precios</button>
+      </div>
     </div>
 
     <!-- FILTRO -->
@@ -165,6 +168,100 @@
       </div>
     </div>
 
+    <!-- ============ MODAL: EDITAR PRECIOS EN BLOQUE (todos los tamaños de un producto) ============ -->
+    <div v-if="showEditarBloque" class="modal-overlay" @click.self="showEditarBloque = false">
+      <div class="modal-box modal-lg">
+        <div class="modal-header">
+          <p class="modal-title">✎ Editar precios por producto</p>
+          <button class="modal-close" @click="showEditarBloque = false">✕</button>
+        </div>
+
+        <div class="modal-body-pad modal-scroll">
+          <div class="ff" style="max-width:280px; margin-bottom:1.25rem;">
+            <label>Producto</label>
+            <select v-model="bloqueForm.prodId" @change="onProdBloqueChange">
+              <option value="">Seleccionar...</option>
+              <option v-for="p in productos" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+            </select>
+          </div>
+
+          <p v-if="bloqueForm.prodId && bloqueCargando" class="c-muted" style="font-size:0.85rem;">
+            Cargando tamaños...
+          </p>
+          <p v-else-if="bloqueForm.prodId && !bloqueForm.variantes.length" class="c-muted" style="font-size:0.85rem;">
+            Este producto no tiene tamaños/precios asignados todavía.
+          </p>
+
+          <div v-if="bloqueForm.variantes.length" style="
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 10px 16px;
+              border-bottom: 1px solid var(--border);
+              font-size: 0.78rem;
+              font-weight: 700;
+              color: var(--text3);
+              text-transform: uppercase;
+              letter-spacing: 0.06em;
+              display: grid;
+              grid-template-columns: 1fr 160px;
+              gap: 12px;
+            ">
+              <span>Tamaño</span>
+              <span>Precio</span>
+            </div>
+
+            <div
+              v-for="v in bloqueForm.variantes" :key="v.id"
+              style="
+                padding: 10px 16px;
+                border-bottom: 1px solid var(--border2);
+                display: grid;
+                grid-template-columns: 1fr 160px;
+                gap: 12px;
+                align-items: center;
+              "
+            >
+              <span style="font-weight:600; color:var(--purple);">
+                {{ v.tamaño?.nombre ?? v.tamano?.nombre }}
+              </span>
+              <div style="position:relative;">
+                <span style="
+                  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+                  color:var(--text3); font-size:0.85rem; pointer-events:none;
+                ">$</span>
+                <input
+                  v-model="v.precioNuevo"
+                  type="number" min="0"
+                  style="
+                    width:100%; padding:6px 8px 6px 22px;
+                    border-radius:6px;
+                    border:1px solid var(--border);
+                    background:var(--bg2);
+                    color:var(--cyan);
+                    font-weight:600;
+                    font-size:0.9rem;
+                  "
+                />
+              </div>
+            </div>
+          </div>
+
+          <p v-if="modalBloque.error" class="modal-err">{{ modalBloque.error }}</p>
+        </div>
+
+        <div class="modal-footer-pad">
+          <button class="bsm bd" @click="showEditarBloque = false">Cancelar</button>
+          <button class="bpri" :disabled="!bloqueForm.variantes.length || guardando" @click="guardarBloque">
+            {{ guardando ? 'Guardando...' : '💾 Guardar todos los precios' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ MODAL: EDITAR PRECIO ============ -->
     <div v-if="editando" class="modal-overlay" @click.self="editando = null">
       <div class="modal-box modal-sm">
@@ -275,6 +372,11 @@ const modalConfirm = ref(null)
 const guardando    = ref(false)
 const toast        = ref(null)
 
+const showEditarBloque = ref(false)
+const bloqueCargando   = ref(false)
+const bloqueForm       = ref({ prodId: '', variantes: [] })
+const modalBloque      = ref({ error: '' })
+
 function setToast(texto, ok = true) {
   toast.value = { texto, ok }
   setTimeout(() => { toast.value = null }, 3000)
@@ -312,6 +414,64 @@ function abrirCrear() {
   form.value = { prodId: '', precios: {}, activos: {} }
   tamanosExistentes.value = new Set()
   modalCrear.value = { error: '' }
+}
+
+function abrirEditarBloque() {
+  showEditarBloque.value = true
+  bloqueForm.value = { prodId: '', variantes: [] }
+  modalBloque.value = { error: '' }
+}
+
+async function onProdBloqueChange() {
+  bloqueForm.value.variantes = []
+  modalBloque.value = { error: '' }
+  if (!bloqueForm.value.prodId) return
+
+  bloqueCargando.value = true
+  try {
+    const vars = await api('GET', `/variantes/producto/${bloqueForm.value.prodId}`)
+    bloqueForm.value.variantes = vars.map(v => ({ ...v, precioNuevo: v.precio }))
+  } catch {
+    bloqueForm.value.variantes = []
+  } finally {
+    bloqueCargando.value = false
+  }
+}
+
+async function guardarBloque() {
+  // solo manda las que de verdad cambiaron de precio
+  const cambiadas = bloqueForm.value.variantes.filter(v =>
+    v.precioNuevo !== '' && v.precioNuevo !== null && Number(v.precioNuevo) !== Number(v.precio)
+  )
+
+  if (!cambiadas.length) {
+    modalBloque.value.error = 'No hay cambios de precio para guardar'
+    return
+  }
+
+  guardando.value = true
+  try {
+    const resultados = await Promise.allSettled(
+      cambiadas.map(v => api('PUT', `/variantes/${v.id}`, {
+        idProducto: v.producto?.id,
+        idTamano:   v.tamaño?.id ?? v.tamano?.id,
+        precio:     parseFloat(v.precioNuevo)
+      }))
+    )
+
+    const ok  = resultados.filter(r => r.status === 'fulfilled').length
+    const err = resultados.filter(r => r.status === 'rejected').length
+
+    if (err === 0) {
+      showEditarBloque.value = false
+      setToast(`✓ ${ok} precio(s) actualizado(s)`)
+    } else {
+      modalBloque.value.error = `${ok} actualizados, ${err} fallaron`
+    }
+    cargar()
+  } finally {
+    guardando.value = false
+  }
 }
 
 async function onProdFormChange() {
