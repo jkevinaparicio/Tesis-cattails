@@ -18,12 +18,32 @@
       </div>
       <div class="ff" style="margin:0; min-width:180px;">
         <label>Por sede</label>
-        <select v-model="filtroSede" @change="filtrarSede">
+        <select v-model="filtroSede" @change="filtrarPorFechaOSede">
           <option value="">Todas...</option>
           <option v-for="s in sedes" :key="s.id" :value="s.id">
             {{ s.nombre }}
           </option>
         </select>
+      </div>
+      <div class="ff" style="margin:0; min-width:170px;">
+        <label>Día (cierre de caja)</label>
+        <input v-model="filtroFecha" type="date" @change="filtrarPorFechaOSede" />
+      </div>
+      <button v-if="filtroFecha" class="bsm bd" @click="limpiarFecha">✕ Quitar fecha</button>
+    </div>
+
+    <p v-if="filtroFecha" class="c-muted" style="font-size:0.78rem; margin:-0.75rem 0 1rem;">
+      Viernes y sábado el corte es a la 1am, así que ese día incluye lo vendido en la madrugada siguiente.
+    </p>
+
+    <div class="resumen-cierre">
+      <div class="resumen-card">
+        <span class="resumen-label">Ventas totales</span>
+        <span class="resumen-valor">{{ totalElementos }}</span>
+      </div>
+      <div class="resumen-card">
+        <span class="resumen-label">{{ filtroFecha ? 'Total de esta página' : 'Suma de esta página' }}</span>
+        <span class="resumen-valor c-cyan">${{ totalPagina.toLocaleString() }}</span>
       </div>
     </div>
 
@@ -70,7 +90,7 @@
             <td>
               <div class="btn-r">
                 <button class="bsm be2" @click="verDetalle(v)">Ver detalle</button>
-                <button class="bsm bd"  @click="eliminar(v.id)">Eliminar</button>
+                <button class="bsm bd"  @click="abrirConfirmEliminar(v)">Eliminar</button>
               </div>
             </td>
           </tr>
@@ -78,9 +98,15 @@
       </table>
     </div>
 
-    <!-- MODAL -->
+    <div class="paginador" v-if="totalPaginas > 1">
+      <button class="bsm bd" :disabled="pagina === 0" @click="irAPagina(pagina - 1)">‹ Anterior</button>
+      <span class="pag-info">Página {{ pagina + 1 }} de {{ totalPaginas }}</span>
+      <button class="bsm bd" :disabled="pagina >= totalPaginas - 1" @click="irAPagina(pagina + 1)">Siguiente ›</button>
+    </div>
+
+    <!-- MODAL: VER DETALLE -->
     <div v-if="ventaDetalle" class="modal-overlay" @click.self="ventaDetalle = null">
-      <div class="modal-box">
+      <div class="modal-box" style="max-width:640px;">
         <div class="modal-header">
           <div>
             <p class="modal-title">
@@ -129,32 +155,92 @@
           </div>
         </div>
 
-        <div class="modal-footer">
+        <div class="modal-footer" style="flex-direction:column; align-items:stretch; gap:10px;">
           <p class="modal-fecha">{{ ventaDetalle.fecha }}</p>
-          <div class="modal-total">
+          <div v-if="ventaDetalle.tipoPedido === 'DOMICILIO' && Number(ventaDetalle.valorDomicilio) > 0"
+               style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span style="font-size:0.78rem; color:var(--text3);">Subtotal productos</span>
+              <span style="font-size:0.85rem; color:var(--text2);">${{ subtotalProductosDetalle.toLocaleString() }}</span>
+            </div>
+            <div style="display:flex; gap:12px; align-items:baseline;">
+              <span style="font-size:0.78rem; color:var(--text3);">🛵 Domicilio</span>
+              <span style="font-size:0.85rem; color:var(--purple); font-weight:600;">
+                ${{ Number(ventaDetalle.valorDomicilio).toLocaleString() }}
+              </span>
+            </div>
+          </div>
+          <div class="modal-total" style="align-self:flex-end;">
             <span class="ct-lbl">Total</span>
             <span class="ct-val">${{ Number(ventaDetalle.total).toLocaleString() }}</span>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- MODAL: CONFIRMAR ELIMINACIÓN -->
+    <div v-if="modalConfirm" class="modal-overlay" @click.self="modalConfirm = null">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+          <p class="modal-title" style="color:var(--err);">⚠ Eliminar venta</p>
+          <button class="modal-close" @click="modalConfirm = null">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding:1.25rem;">
+          <p style="font-size:0.92rem; font-weight:600; color:var(--purple); margin:0;">
+            ¿Eliminar la venta #{{ modalConfirm.venta.id }}?
+          </p>
+          <p class="c-muted" style="font-size:0.8rem; margin-top:8px;">
+            {{ modalConfirm.venta.usuario }} — {{ modalConfirm.venta.sede }} — ${{ Number(modalConfirm.venta.total).toLocaleString() }}
+          </p>
+          <p class="c-muted" style="font-size:0.8rem; margin-top:4px;">
+            El stock de los productos vendidos se devuelve automáticamente al inventario. Esta acción no se puede deshacer.
+          </p>
+          <p v-if="modalConfirm.error" style="margin-top:10px; font-size:0.82rem; color:var(--err); font-weight:500;">
+            {{ modalConfirm.error }}
+          </p>
+        </div>
+
+        <div class="modal-footer" style="justify-content:flex-end; gap:10px;">
+          <button class="bsm bd" @click="modalConfirm = null">Cancelar</button>
+          <button class="bpri" style="background:var(--err); border-color:var(--err);"
+                  :disabled="eliminando" @click="confirmarEliminacion">
+            {{ eliminando ? 'Eliminando...' : 'Sí, eliminar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div v-if="toast" class="toast" :class="toast.ok ? 'ok' : 'err'">{{ toast.texto }}</div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAdmin } from '@/composables/useAdmin'
 import { useWebSocket } from '@/composables/useWebSocket'
 
 const { api, loading } = useAdmin()
 const { conectar, desconectar } = useWebSocket()
 
-const ventas        = ref([])
-const usuarios      = ref([])
-const sedes         = ref([])
-const filtroUsuario = ref('')
-const filtroSede    = ref('')
-const ventaDetalle  = ref(null)
+const TAMANO_PAGINA = 50
+
+const ventas         = ref([])
+const usuarios       = ref([])
+const sedes          = ref([])
+const filtroUsuario  = ref('')
+const filtroSede     = ref('')
+const filtroFecha    = ref('')
+const ventaDetalle   = ref(null)
+
+const pagina          = ref(0)
+const totalPaginas    = ref(0)
+const totalElementos  = ref(0)
+
+const modalConfirm = ref(null)
+const eliminando   = ref(false)
+const toast        = ref(null)
 
 const metodosMap = {
   EFECTIVO:    '💵 Efectivo',
@@ -162,63 +248,121 @@ const metodosMap = {
   BANCOLOMBIA: '🏦 Bancolombia',
 }
 
+function setToast(texto, ok = true) {
+  toast.value = { texto, ok }
+  setTimeout(() => { toast.value = null }, 3000)
+}
+
+const totalPagina = computed(() =>
+  ventas.value.reduce((acc, v) => acc + Number(v.total || 0), 0)
+)
+
+const subtotalProductosDetalle = computed(() => {
+  if (!ventaDetalle.value?.detalles) return 0
+  return ventaDetalle.value.detalles.reduce((acc, d) => acc + Number(d.subtotal || 0), 0)
+})
+
 onMounted(async () => {
+  const [u, s] = await Promise.all([
+    api('GET', '/usuarios').catch(() => []),
+    api('GET', '/sedes/listar').catch(() => [])
+  ])
+  usuarios.value = u
+  sedes.value    = s
   await cargar()
+
   conectar((ventaNueva) => {
-    // evita duplicados
-    const existe = ventas.value.find(v => v.id === ventaNueva.id)
-    if (!existe) ventas.value.unshift(ventaNueva)
+    const sinFiltros = !filtroUsuario.value && !filtroSede.value && !filtroFecha.value
+    if (sinFiltros && pagina.value === 0) {
+      const existe = ventas.value.find(v => v.id === ventaNueva.id)
+      if (!existe) ventas.value.unshift(ventaNueva)
+    }
   })
 })
 
 onUnmounted(() => desconectar())
 
-async function cargar() {
+async function aplicarPagina() {
   loading.value = true
   try {
-    const [v, u, s] = await Promise.all([
-      api('GET', '/ventas/todas'),
-      api('GET', '/usuarios'),
-      api('GET', '/sedes/listar')
-    ])
-    ventas.value   = v
-    usuarios.value = u
-    sedes.value    = s
-    filtroUsuario.value = ''
-    filtroSede.value    = ''
+    const qp = `page=${pagina.value}&size=${TAMANO_PAGINA}`
+    let url
+
+    if (filtroUsuario.value) {
+      url = `/ventas/usuario/${filtroUsuario.value}?${qp}`
+    } else if (filtroFecha.value && filtroSede.value) {
+      url = `/ventas/sede/${filtroSede.value}/fecha/${filtroFecha.value}?${qp}`
+    } else if (filtroFecha.value) {
+      url = `/ventas/fecha/${filtroFecha.value}?${qp}`
+    } else if (filtroSede.value) {
+      url = `/ventas/sede/${filtroSede.value}?${qp}`
+    } else {
+      url = `/ventas/todas?${qp}`
+    }
+
+    const res = await api('GET', url)
+    ventas.value          = res.content ?? []
+    totalPaginas.value    = res.totalPages ?? 0
+    totalElementos.value  = res.totalElements ?? ventas.value.length
   } catch {
     ventas.value = []
+    totalPaginas.value = 0
+    totalElementos.value = 0
   } finally {
     loading.value = false
   }
 }
 
+async function cargar() {
+  filtroUsuario.value = ''
+  filtroSede.value    = ''
+  filtroFecha.value   = ''
+  pagina.value        = 0
+  await aplicarPagina()
+}
+
 async function filtrarUsuario() {
-  if (!filtroUsuario.value) { cargar(); return }
-  loading.value = true
-  try {
-    ventas.value = await api('GET', `/ventas/usuario/${filtroUsuario.value}`)
-    filtroSede.value = ''
-  } catch { ventas.value = [] }
-  finally { loading.value = false }
+  filtroSede.value  = ''
+  filtroFecha.value = ''
+  pagina.value      = 0
+  if (!filtroUsuario.value) { await cargar(); return }
+  await aplicarPagina()
 }
 
-async function filtrarSede() {
-  if (!filtroSede.value) { cargar(); return }
-  loading.value = true
-  try {
-    ventas.value = await api('GET', `/ventas/sede/${filtroSede.value}`)
-    filtroUsuario.value = ''
-  } catch { ventas.value = [] }
-  finally { loading.value = false }
+async function filtrarPorFechaOSede() {
+  filtroUsuario.value = ''
+  pagina.value        = 0
+  await aplicarPagina()
 }
 
-async function eliminar(id) {
-  if (!confirm('¿Eliminar esta venta?')) return
+function limpiarFecha() {
+  filtroFecha.value = ''
+  pagina.value = 0
+  aplicarPagina()
+}
+
+function irAPagina(nueva) {
+  if (nueva < 0 || nueva >= totalPaginas.value) return
+  pagina.value = nueva
+  aplicarPagina()
+}
+
+function abrirConfirmEliminar(v) {
+  modalConfirm.value = { venta: v, error: '' }
+}
+
+async function confirmarEliminacion() {
+  eliminando.value = true
   try {
-    await api('DELETE', `/ventas/eliminar/${id}`)
-    ventas.value = ventas.value.filter(v => v.id !== id)
-  } catch (e) { alert(e.message) }
+    await api('DELETE', `/ventas/eliminar/${modalConfirm.value.venta.id}`)
+    modalConfirm.value = null
+    setToast('✓ Venta eliminada, stock devuelto al inventario')
+    await aplicarPagina()
+  } catch (e) {
+    modalConfirm.value.error = e.response?.data || e.message || 'Error al eliminar'
+  } finally {
+    eliminando.value = false
+  }
 }
 
 function verDetalle(v) {
@@ -239,7 +383,7 @@ function verDetalle(v) {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  width: 100%; max-width: 640px;
+  width: 100%;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: modal-in 0.2s ease;
@@ -286,4 +430,54 @@ function verDetalle(v) {
 }
 .modal-fecha { font-size: 0.78rem; color: var(--text3); font-weight: 500; }
 .modal-total { display: flex; align-items: baseline; gap: 12px; }
+
+.resumen-cierre {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.resumen-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--border, #333) 70%, transparent);
+  border-radius: 8px;
+}
+.resumen-label {
+  font-size: 0.75rem;
+  color: var(--text3);
+}
+.resumen-valor {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.paginador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.pag-info {
+  font-size: 0.85rem;
+  color: var(--text2);
+  font-weight: 500;
+}
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  padding: 10px 20px; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 600;
+  z-index: 1100; box-shadow: var(--shadow-lg);
+  animation: toast-in 0.2s ease;
+}
+.toast.ok  { background: var(--ok);  color: #fff; }
+.toast.err { background: var(--err); color: #fff; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 </style>
